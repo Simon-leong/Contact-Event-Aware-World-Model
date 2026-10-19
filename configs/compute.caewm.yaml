@@ -1,0 +1,20 @@
+# CAEWM v1: two GPUs with torchrun DDP.
+# 1 x accum 4 x 2 ranks = effective batch 8 (= v6's 1 x 8 on one card)
+target: l40sx2
+profiles:
+  l40sx2:
+    description: "2 GPUs, torchrun DDP/NCCL"
+    launcher: torchrun
+    nproc_per_node: 2
+    dtype: bf16
+    batch_size: 1
+    grad_accum: 4
+    num_workers: 8
+  l40sx1:
+    description: "1 GPU smoke runs (effective batch 8 via accum 8)"
+    launcher: python
+    nproc_per_node: 1
+    dtype: bf16
+    batch_size: 1
+    grad_accum: 8
+    num_workers: 8

@@ -1,0 +1,7 @@
+# Runtime logs are retained verbatim, including the simulator's whitespace.
+tests/fixtures/reference/**/*.log -text -whitespace
+# Renderer fixtures keep byte hashes.
+tests/fixtures/reference/**/*.usda -text -whitespace
+# Keep the frozen study inputs identifiable in GitHub review.
+tests/fixtures/reference/**/*.json linguist-generated=true
+tests/fixtures/reference/**/*.log linguist-generated=true

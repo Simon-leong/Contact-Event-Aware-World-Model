@@ -1,0 +1,1246 @@
+{
+ "split": "val",
+ "plan_seed": 7,
+ "windows": [
+  {
+   "episode": "Carton/ep_Carton_1785609270_002",
+   "t0": 30001.57952153308,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609270_002",
+   "t0": 30012.461211209513,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609381_004",
+   "t0": 30112.120085312814,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609381_004",
+   "t0": 30112.51792184933,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609504_008",
+   "t0": 30234.403940548884,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609504_008",
+   "t0": 30246.673959829048,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609546_009",
+   "t0": 30276.167822920434,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609546_009",
+   "t0": 30285.085356699867,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609582_010",
+   "t0": 30314.500807994875,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609582_010",
+   "t0": 30317.00991622976,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609645_012",
+   "t0": 30377.50918832936,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609645_012",
+   "t0": 30377.946617838752,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609697_013",
+   "t0": 30427.444373587445,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609697_013",
+   "t0": 30431.9198038352,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609779_015",
+   "t0": 30509.77166957714,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609779_015",
+   "t0": 30513.924089559554,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609825_017",
+   "t0": 30557.30758858896,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609825_017",
+   "t0": 30563.985488037593,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609879_019",
+   "t0": 30610.276846778772,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785609879_019",
+   "t0": 30621.99997744446,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610250_006",
+   "t0": 30982.090046798203,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610250_006",
+   "t0": 30980.689559270824,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610338_010",
+   "t0": 31069.551762022056,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610338_010",
+   "t0": 31067.579367946277,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610393_013",
+   "t0": 31123.4551122699,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610393_013",
+   "t0": 31127.69245635067,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610418_014",
+   "t0": 31149.05566563442,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610418_014",
+   "t0": 31156.754955804252,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610440_015",
+   "t0": 31172.421017500335,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610440_015",
+   "t0": 31175.10949454213,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610475_017",
+   "t0": 31207.85155698951,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610475_017",
+   "t0": 31207.165797194695,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610501_018",
+   "t0": 31232.570170259707,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610501_018",
+   "t0": 31232.40584686378,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610556_019",
+   "t0": 31287.659070043643,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610556_019",
+   "t0": 31286.982633596657,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610578_020",
+   "t0": 31309.28273917028,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610578_020",
+   "t0": 31306.933821988747,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610603_021",
+   "t0": 31336.08006921624,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_Carton_1785610603_021",
+   "t0": 31333.745332586397,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_carton_1787400225_000",
+   "t0": 9885.491277278632,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_carton_1787400225_000",
+   "t0": 9894.305341037827,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_carton_1787400259_001",
+   "t0": 9919.610808527572,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_carton_1787400259_001",
+   "t0": 9929.426678241209,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_carton_1787400295_002",
+   "t0": 9956.42857216157,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_carton_1787400295_002",
+   "t0": 9962.368904712666,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_carton_1787400366_004",
+   "t0": 10023.771002266303,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_carton_1787400366_004",
+   "t0": 10028.561092640772,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_carton_1787400396_005",
+   "t0": 10054.807381180894,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_carton_1787400396_005",
+   "t0": 10062.951947106629,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_carton_1787400429_006",
+   "t0": 10088.967942445373,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_carton_1787400429_006",
+   "t0": 10093.786860619512,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_carton_1787400470_007",
+   "t0": 10131.668654898633,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_carton_1787400470_007",
+   "t0": 10131.397409973499,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_carton_1787400502_008",
+   "t0": 10160.721916015813,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_carton_1787400502_008",
+   "t0": 10159.040077047515,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_carton_1787400534_009",
+   "t0": 10194.40870175671,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_carton_1787400534_009",
+   "t0": 10195.669975805913,
+   "terminal": false
+  },
+  {
+   "episode": "Carton/ep_carton_1787400568_010",
+   "t0": 10227.17134081734,
+   "terminal": true
+  },
+  {
+   "episode": "Carton/ep_carton_1787400568_010",
+   "t0": 10232.258478661332,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777018_000",
+   "t0": 1715.2435054059422,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777018_000",
+   "t0": 1720.3834355399947,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777083_002",
+   "t0": 1780.6373837889198,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777083_002",
+   "t0": 1777.66841947312,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777201_004",
+   "t0": 1899.4850001153316,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777201_004",
+   "t0": 1897.628741084769,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777238_005",
+   "t0": 1935.8346439645202,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777238_005",
+   "t0": 1930.5551478155771,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777267_006",
+   "t0": 1962.0234605043377,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777267_006",
+   "t0": 1961.9404235151121,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777328_007",
+   "t0": 2023.3901573103701,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777328_007",
+   "t0": 2023.3800123649892,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777359_008",
+   "t0": 2054.193213002977,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777359_008",
+   "t0": 2059.6873107570987,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777411_009",
+   "t0": 2108.883477036525,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777411_009",
+   "t0": 2122.1141396571975,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777450_010",
+   "t0": 2147.5919990334783,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777450_010",
+   "t0": 2160.4564359503315,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777487_011",
+   "t0": 2182.948961731186,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777487_011",
+   "t0": 2180.448992561658,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777628_001",
+   "t0": 2324.686312650949,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777628_001",
+   "t0": 2336.595648960178,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777661_002",
+   "t0": 2355.352381600473,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777661_002",
+   "t0": 2354.8592894507187,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777733_004",
+   "t0": 2430.7478561609496,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777733_004",
+   "t0": 2436.42607698688,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777764_005",
+   "t0": 2459.8824937933205,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777764_005",
+   "t0": 2461.685932942872,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777794_006",
+   "t0": 2489.6680469903113,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777794_006",
+   "t0": 2489.4442322479213,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777833_007",
+   "t0": 2528.540681752196,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777833_007",
+   "t0": 2538.5627984951925,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1785777862_008",
+   "t0": 2558.5427665873576,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1785777862_008",
+   "t0": 2563.558193045319,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1787405044_000",
+   "t0": 14705.598263173672,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1787405044_000",
+   "t0": 14713.392224263118,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1787405083_001",
+   "t0": 14742.46349385308,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1787405083_001",
+   "t0": 14744.277431866469,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1787405118_002",
+   "t0": 14777.515444015698,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1787405118_002",
+   "t0": 14775.535368054647,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1787405151_003",
+   "t0": 14812.383970624962,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1787405151_003",
+   "t0": 14817.770690971207,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1787405186_004",
+   "t0": 14848.296694221171,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1787405186_004",
+   "t0": 14851.867838529915,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1787405223_005",
+   "t0": 14884.962663490176,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1787405223_005",
+   "t0": 14884.910759948316,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1787405296_007",
+   "t0": 14956.849097586999,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1787405296_007",
+   "t0": 14963.47595618805,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1787405332_008",
+   "t0": 14992.340146594104,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1787405332_008",
+   "t0": 14995.393021091422,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1787405364_009",
+   "t0": 15023.721395954231,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1787405364_009",
+   "t0": 15033.512301937499,
+   "terminal": false
+  },
+  {
+   "episode": "egg/ep_egg_1787405397_010",
+   "t0": 15055.921248720539,
+   "terminal": true
+  },
+  {
+   "episode": "egg/ep_egg_1787405397_010",
+   "t0": 15068.1576419413,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785593827_002",
+   "t0": 14557.423804518809,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785593827_002",
+   "t0": 14565.203975310082,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785593867_004",
+   "t0": 14598.020382588662,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785593867_004",
+   "t0": 14596.572094135618,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785593910_007",
+   "t0": 14640.668775847438,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785593910_007",
+   "t0": 14647.957378482977,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594008_012",
+   "t0": 14739.342348506838,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594008_012",
+   "t0": 14743.554406764408,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594044_014",
+   "t0": 14774.896244508776,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594044_014",
+   "t0": 14778.298098214562,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594102_016",
+   "t0": 14834.055905107964,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594102_016",
+   "t0": 14832.793585282468,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594125_017",
+   "t0": 14855.48281523564,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594125_017",
+   "t0": 14857.94466915231,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594169_018",
+   "t0": 14900.898860192086,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594169_018",
+   "t0": 14901.544721586257,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594205_020",
+   "t0": 14935.803317314083,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594205_020",
+   "t0": 14939.875005430902,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594230_021",
+   "t0": 14962.667454168897,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594230_021",
+   "t0": 14961.923967485724,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594294_001",
+   "t0": 15026.781470285167,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594294_001",
+   "t0": 15028.292798028519,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594329_003",
+   "t0": 15061.067008912392,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594329_003",
+   "t0": 15064.817562177905,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594380_005",
+   "t0": 15110.822653047984,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594380_005",
+   "t0": 15118.824952063598,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594403_006",
+   "t0": 15135.21384389793,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594403_006",
+   "t0": 15139.099451494116,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594465_009",
+   "t0": 15197.947506538236,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594465_009",
+   "t0": 15208.091478792356,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594503_010",
+   "t0": 15233.47532904113,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594503_010",
+   "t0": 15240.520313722336,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594563_013",
+   "t0": 15297.330930346008,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594563_013",
+   "t0": 15297.979331830875,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594701_020",
+   "t0": 15434.01504327509,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594701_020",
+   "t0": 15443.323300075555,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594728_021",
+   "t0": 15459.117417914913,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594728_021",
+   "t0": 15465.851951275923,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594797_024",
+   "t0": 15529.868895568246,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1785594797_024",
+   "t0": 15536.166072314147,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1787395928_000",
+   "t0": 5588.11097506978,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1787395928_000",
+   "t0": 5597.102996792457,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1787395963_001",
+   "t0": 5621.634345001189,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1787395963_001",
+   "t0": 5624.195397381596,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396028_003",
+   "t0": 5687.868761074183,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396028_003",
+   "t0": 5683.900297040063,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396060_004",
+   "t0": 5719.132219045611,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396060_004",
+   "t0": 5730.1621104457145,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396094_005",
+   "t0": 5754.2007705624355,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396094_005",
+   "t0": 5751.078894318493,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396128_006",
+   "t0": 5786.992369310015,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396128_006",
+   "t0": 5789.762366946358,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396273_010",
+   "t0": 5931.238270613883,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396273_010",
+   "t0": 5937.5095218705565,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396314_011",
+   "t0": 5972.865150948448,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396314_011",
+   "t0": 5983.675446990727,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396346_012",
+   "t0": 6005.975896650804,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396346_012",
+   "t0": 6011.398494009899,
+   "terminal": false
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396461_000",
+   "t0": 6120.840770271149,
+   "terminal": true
+  },
+  {
+   "episode": "waffles/ep_waffles_1787396461_000",
+   "t0": 6119.1269296237815,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785874897_000",
+   "t0": 13064.835514051794,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785874897_000",
+   "t0": 13069.628203351578,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785874979_002",
+   "t0": 13149.15375899917,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785874979_002",
+   "t0": 13158.803796845341,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875018_003",
+   "t0": 13186.606578283923,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875018_003",
+   "t0": 13185.679662614508,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875056_004",
+   "t0": 13224.646863208185,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875056_004",
+   "t0": 13234.400709986148,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875094_005",
+   "t0": 13263.452034635868,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875094_005",
+   "t0": 13270.164536831277,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875140_006",
+   "t0": 13309.548238792855,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875140_006",
+   "t0": 13306.723334350605,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875178_007",
+   "t0": 13346.606348316307,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875178_007",
+   "t0": 13344.272056355965,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875259_009",
+   "t0": 13427.236398527535,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875259_009",
+   "t0": 13429.360924647935,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875299_010",
+   "t0": 13467.456251045836,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875299_010",
+   "t0": 13474.429732139213,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875338_011",
+   "t0": 13505.905619021543,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875338_011",
+   "t0": 13512.832221515602,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875453_000",
+   "t0": 13620.651672774702,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875453_000",
+   "t0": 13629.151357529381,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875489_001",
+   "t0": 13657.211439229493,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875489_001",
+   "t0": 13660.301613701,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875525_002",
+   "t0": 13694.36182366962,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875525_002",
+   "t0": 13699.39213530852,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875566_003",
+   "t0": 13734.540941128258,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875566_003",
+   "t0": 13742.186100878906,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875603_004",
+   "t0": 13771.730112688041,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875603_004",
+   "t0": 13771.346505520605,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875641_005",
+   "t0": 13808.932451667471,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875641_005",
+   "t0": 13806.959315313108,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875682_007",
+   "t0": 13850.527192064306,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875682_007",
+   "t0": 13862.838716497616,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875719_008",
+   "t0": 13888.601541815435,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875719_008",
+   "t0": 13885.400233937284,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875757_009",
+   "t0": 13925.328001866083,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875757_009",
+   "t0": 13927.71558122712,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875799_010",
+   "t0": 13966.885119169974,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875799_010",
+   "t0": 13973.821140430911,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875870_012",
+   "t0": 14037.625812326689,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1785875870_012",
+   "t0": 14040.166068041022,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411199_000",
+   "t0": 20857.199183462806,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411199_000",
+   "t0": 20865.038505740926,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411234_001",
+   "t0": 20891.450256136453,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411234_001",
+   "t0": 20899.626324059416,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411268_002",
+   "t0": 20925.873575308306,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411268_002",
+   "t0": 20926.537189926712,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411306_003",
+   "t0": 20965.433215393747,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411306_003",
+   "t0": 20971.71618378004,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411344_004",
+   "t0": 21001.91895520611,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411344_004",
+   "t0": 21001.47012226521,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411481_008",
+   "t0": 21138.596819378876,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411481_008",
+   "t0": 21146.13991975071,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411521_009",
+   "t0": 21178.549552916127,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411521_009",
+   "t0": 21188.786299891774,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411589_011",
+   "t0": 21246.50716120875,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411589_011",
+   "t0": 21255.21838816495,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411627_012",
+   "t0": 21285.46436103834,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411627_012",
+   "t0": 21295.380152034053,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411670_013",
+   "t0": 21327.69295407547,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411670_013",
+   "t0": 21326.31342500705,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411764_000",
+   "t0": 21421.952062653876,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411764_000",
+   "t0": 21422.48676410696,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411803_001",
+   "t0": 21460.63428498018,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411803_001",
+   "t0": 21473.812619500215,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411849_002",
+   "t0": 21506.45103827495,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411849_002",
+   "t0": 21508.121964429472,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411888_003",
+   "t0": 21546.698610395506,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787411888_003",
+   "t0": 21553.120425849065,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787412075_000",
+   "t0": 21732.253676563214,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787412075_000",
+   "t0": 21736.277113727163,
+   "terminal": false
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787412112_001",
+   "t0": 21769.847169760546,
+   "terminal": true
+  },
+  {
+   "episode": "whiteboard/ep_whiteboard_1787412112_001",
+   "t0": 21777.961372911945,
+   "terminal": false
+  }
+ ]
+}

@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phantom-robot"
+version = "0.1.0"
+description = "CAEWM: a contact-aware world-action model with a learned tactile latent, geometry-anchored vision-touch bridges and group-wise noise"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+dependencies = [
+    "numpy>=1.24",
+    "pydantic>=2.5",
+    "PyYAML>=6.0",
+    "zarr>=2.16,<3",
+    "numcodecs<0.16",
+    "einops>=0.7",
+    "pillow>=10",     # scene/camera JPEG storage codec (cv2 is the rig fast path)
+]
+
+[project.optional-dependencies]
+sim = [
+    "scipy>=1.10",
+    "opencv-python-headless>=4.8",
+    "matplotlib>=3.7",
+]
+# Model/training stack (needs a CUDA box for real runs; CPU ok for tiny smoke tests)
+train = [
+    # floor raised 2.7 -> 2.13 on 2026-09-19: four GitHub advisories cover
+    # torch <= 2.12.1. requirements/*.txt pin the exact GPU pair (2.13.0+cu129
+    # / torchvision 0.28.0); this floor only keeps a plain `pip install -e .`
+    # off the flagged releases.
+    "torch>=2.13",
+    "peft>=0.11",
+    "safetensors",
+    "tensorboard",
+]
+# Import-time deps of the cosmos-predict2.5 submodule (imported as a library;
+# CUDA-only packages like transformer-engine are shimmed by backbone/compat.py)
+cosmos = [
+    "loguru",
+    "omegaconf",
+    "attrs",
+    "iopath",
+    "nvidia-ml-py",
+    "boto3",
+    "imageio",
+    "pandas",
+    "torchvision",
+]
+# Real hardware drivers (recording rig / deployment box only)
+hw = [
+    "ur-rtde>=1.5",
+    "pyrealsense2",
+    "pyspacemouse",
+    "pyserial>=3.5",     # Echo exoskeleton leader (teleop/echo.py)
+    "opencv-python",
+]
+# Live visualization: rerun.io stream + the web control panel's embedded view
+viz = [
+    "rerun-sdk>=0.20",
+]
+dev = [
+    "pytest>=8",
+    "pytest-timeout",
+]
+
+[tool.setuptools.packages.find]
+include = ["phantom*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 300
