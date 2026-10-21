@@ -39,8 +39,15 @@ def build_caewm_model(hw, paths, *, mc, tiny=False, load_base=True, lora=True,
                                  device=device, dtype=dtype)
     from phantom.model.hht.hht import HHT
     hht = HHT(hw, bb, mc, vae, student=True).to(device=device, dtype=dtype)
-    ae = (load_ae(mc.tactile_ae, device) if mc.tactile_ae
-          else CausalTactileAE().to(device).eval().requires_grad_(False))
+    if mc.tactile_ae or not tiny:
+        import phantom.caewm.paths as CP
+        ae_path = CP.stored_or_default(mc.tactile_ae, CP.TAC_AE)
+        if not ae_path.exists():
+            raise FileNotFoundError(f"tactile tokenizer not found at {ae_path} (checkpoint records "
+                                    f"{mc.tactile_ae!r}); place tactile_ae.pt there or set runs_root")
+        ae = load_ae(ae_path, device)
+    else:
+        ae = CausalTactileAE().to(device).eval().requires_grad_(False)
     rf = CaewmRectifiedFlow(net, hht, hw, bb, mc, layout, vae, text, ae).to(device=device, dtype=dtype)
     rf.phantom_event_head.float()
     rf.phantom_sigma_head.float()

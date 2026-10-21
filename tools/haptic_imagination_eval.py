@@ -49,6 +49,7 @@ import math
 import sys
 import time
 from pathlib import Path
+import phantom.caewm.paths as CP
 
 import numpy as np
 
@@ -469,7 +470,7 @@ def main(argv=None) -> int:
     per_window_steps: list[dict] = []     # steps pooled over seeds, per window
     skipped: list[tuple[str, str]] = []
     for wi, w in enumerate(plan):
-        ep = __import__("phantom.caewm.paths", fromlist=["episode_path"]).episode_path(w["episode"])
+        ep = CP.episode_path(w["episode"])
         t0 = float(w["t0"])
         try:
             item = sampler.sample(ep, t0)

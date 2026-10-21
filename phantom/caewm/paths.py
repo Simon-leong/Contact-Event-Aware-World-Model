@@ -28,3 +28,11 @@ def episode_path(p) -> Path:
     """Window files store episodes relative to the task root."""
     p = Path(p)
     return p if p.is_absolute() else TASKS / p
+
+
+def stored_or_default(stored, default) -> Path:
+    """Checkpoints record the absolute paths of the machine they were trained on. Use the
+    recorded path when it exists here, otherwise the default derived from configs/paths*.yaml."""
+    if stored and Path(stored).exists():
+        return Path(stored)
+    return Path(default)

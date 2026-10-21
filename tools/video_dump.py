@@ -42,7 +42,7 @@ def load(ckpt, hw, dev, dt):
         from phantom.caewm.windows import CaewmWindowSampler
         mc = CaewmConfig.from_dict(mcd)
         pm = build_caewm_model(hw, load_paths(), mc=mc, device=dev, dtype=dt, inference=True)
-        sampler = CaewmWindowSampler(hw, pm.bb, norm, seed=0, lat_cache=mc.tactile_lat_cache,
+        sampler = CaewmWindowSampler(hw, pm.bb, norm, seed=0, lat_cache=str(CP.stored_or_default(mc.tactile_lat_cache, CP.LAT_CACHE)),
                                      tac_cache=str(CP.TAC_CACHE),
                                      dz_std=pm.rf.tac_ae.dz_std.cpu().numpy(),
                                      wrench_baseline_rows=wbr)

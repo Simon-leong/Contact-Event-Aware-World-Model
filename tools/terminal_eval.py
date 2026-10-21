@@ -565,9 +565,11 @@ def main(argv: list[str] | None = None) -> int:
     # no gel/fields/contact_state frames (F12)
     from phantom.train.common import wrench_baseline_rows_of
     if caewm:
+        import phantom.caewm.paths as CP
         from phantom.caewm.windows import CaewmWindowSampler
-        sampler = CaewmWindowSampler(hw, pm.bb, norm, seed=0, lat_cache=mc.tactile_lat_cache,
-                                     tac_cache=str(__import__("phantom.caewm.paths", fromlist=["TAC_CACHE"]).TAC_CACHE),
+        sampler = CaewmWindowSampler(hw, pm.bb, norm, seed=0,
+                                     lat_cache=str(CP.stored_or_default(mc.tactile_lat_cache, CP.LAT_CACHE)),
+                                     tac_cache=str(CP.TAC_CACHE),
                                      dz_std=pm.rf.tac_ae.dz_std.cpu().numpy(),
                                      wrench_baseline_rows=wrench_baseline_rows_of(payload))
     else:
