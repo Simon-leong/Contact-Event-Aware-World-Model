@@ -1,136 +1,183 @@
 # CAEWM
 
-CAEWM is a world-action model for contact-rich robot manipulation. From a single scene image, the robot state and, when a sensor is fitted, the recent history of two optical tactile fingertips, it jointly predicts the future video, the future deformation of both fingertip pads and the next chunk of end-effector actions. It is built on the frozen Cosmos-Predict2.5-2B video diffusion backbone and starts from the open-source HapticWAM code base, which serves as our baseline.
+CAEWM is a world action model for contact-rich robot manipulation. From the current scene image, the robot state, the task instruction and, when a sensor is fitted, the recent history of two optical tactile fingertips, it jointly predicts the next 1.6 s of end-effector actions, the next 3 s of fingertip deformation and contact events, and the next 3 s of video. It is built on the frozen Cosmos-Predict2.5-2B video diffusion backbone and starts from the open-source HapticWAM code base, which is our baseline.
 
-This repository holds the first version of the model (V1) and the code that trains and evaluates it. In short, one set of CAEWM weights predicts contact clearly better than every released HapticWAM model, both with and without tactile input, and it also produces sharper future frames, while its action accuracy is still behind the baseline. The sections below explain what we changed, what the experiments show, where V1 falls short and how to reproduce it.
+This branch holds the final version of the model together with the code that trains and evaluates it. The `main` branch keeps the first version. With one set of weights trained once and taken at the last training step, CAEWM reaches a lower action endpoint error than the HapticWAM teacher with tactile input (15.87 mm against 20.05 mm) and than the HapticWAM student without it (16.11 mm against 22.30 mm), and it predicts contact, slip, the ACC signals and future frames better than every released HapticWAM model.
 
-## What CAEWM changes
+## Method
 
-CAEWM keeps the overall design of HapticWAM. The backbone is the frozen Cosmos-Predict2.5-2B. The current image, the robot state, the tactile observation, the future video, the future contact and the actions are laid out as frames of one sequence and generated jointly with rectified flow, and only low-rank adapters on the backbone and the newly added modules are trained. We changed three things, namely how touch enters and leaves the model, how vision and touch are aligned in space, and how the parts of the sequence are noised during training. We also added a readout for slip and contact. Every new module either sits outside the backbone or is inserted between blocks with zero-initialised output layers, so at the first training step the network is identical to the original backbone. CAEWM is trained once from the Cosmos base for 20,000 updates with the recipe of the HapticWAM v6 teacher, using demonstrations only.
+CAEWM keeps the overall design of HapticWAM. The current image, the future images, the tactile observation, the robot state, the future touch and the actions are laid out as frames of one token sequence and denoised jointly with rectified flow. Only low-rank adapters (LoRA) on the backbone and the newly added modules are trained. The central idea is to treat the contact schedule, the time at which each kind of contact event first happens within the prediction window, as a discrete latent variable. The joint distribution is factorised as
 
-The first change is the representation of touch. HapticWAM reads a single mechanical field at the current time, encodes the gel image with a video VAE that was trained on natural video, concatenates the two fingers, and predicts a hand-designed contact package that shares nothing with its input. We instead train a small causal tactile autoencoder of 9.8 M parameters on the training split and then freeze it. For one fingertip it reads the last four frames of the five informative field channels, which are the two in-plane displacement components, the indentation depth and the two shear components, together with the differences between consecutive frames. The three uncalibrated force channels are dropped. The encoder compresses this short history into a 16×8×10 latent, and the decoder reconstructs the current field and its change since the previous frame. The right pad is flipped vertically so that the same cell on both pads covers the same physical location, and the two latents are rewritten as a common part $c=\tfrac12(z^L+z^R)$ and a differential part $d=\tfrac12(z^L-z^R)$, which separate whether the object is held from whether the load is balanced between the fingers. The same latent space serves as input and as output. The input is the latent at $t_0-0.5$ s and at $t_0$, which replaces the gel frame and the single mechanical field. The output is the latent change at six future times
+$$p(a,c,v\mid o)=\sum_{\pi}p(\pi\mid o)\,p(a\mid \pi,o)\,p(c,v\mid a,\pi,o),$$
 
-$$\delta_k=\frac{z(t_0+\tau_k)-z(t_0)}{\sigma_\Delta},\qquad \tau_k=0.5k,\quad k=1,\dots,6,$$
+where $o$ is the current observation (image, tactile observation, robot state and instruction), $a$, $c$ and $v$ are the future actions, touch and images, and $\pi$ is the contact schedule. The schedule covers seven events, which are contact onset and slip on each finger, gripper close, object lift and release. The model first settles when contact will happen, then generates the actions that carry out this schedule, and finally predicts the touch and images that these actions produce. The method has three parts.
 
-where $\sigma_\Delta$ is the standard deviation of latent changes on the training split. An output of zero means that the contact stays as it is, so the model only has to learn how it will change. The predicted change is added back to the current latent and decoded by the frozen decoder into full future deformation fields for both fingers. Contact masks, centres of pressure and slip scores then follow from the same rules HapticWAM uses, so the official scoring functions apply unchanged. The latents are upsampled by two and written losslessly into quarters of a backbone frame, which puts the tactile observation into one frame and the future touch into three.
+### Contact schedule as a latent variable
 
-The second change, GeoBridge, ties touch to the place in the image where the fingertips are. HapticWAM gives its tactile frames the same spatial position encoding as the image. This suggests a relation between a tactile cell and the image cell at the same position, which does not exist, and the model is never told where the fingertips appear in the image. We project the current tool centre point into the scene camera with the calibration that ships with the code and draw a Gaussian $G$ with a standard deviation of 1.5 tokens around it on the 16×20 token grid. After blocks 4, 10, 16 and 22 of the 28 backbone blocks, a bridge exchanges information in both directions. One direction fuses summaries of the four quadrants of the tactile observation frame into a vector $s$ and adds $G(i,j)\,s$ to every image token, so the tokens near the fingertips receive most of it. The other direction takes the $G$-weighted mean of the conditioning image tokens, which summarises the image around the fingertips, and adds its projection to every tactile token. Without a tactile sensor the model relies on this second path to infer touch from what it sees. Both output layers start at zero. The rotary position rows of the tactile frames are also shifted past the image rows, which removes the false spatial correspondence.
+When the gripper closes is often ambiguous, and the distribution of event times is multimodal. Conditioning the actions on the expected event probabilities averages over several possible schedules, and the resulting motion hesitates between them. CAEWM therefore predicts the full distribution of event times, picks one schedule from it with a decision rule, and generates the actions under that schedule.
 
-The third change is group-wise noise. The backbone lets each frame of the sequence carry its own noise level, and a frame at noise level zero acts as a condition. In HapticWAM the set of conditioning frames is fixed, and the model runs without touch only through a separately distilled student. In CAEWM the choice is drawn for every training sample. With Touch Forcing, the tactile observation frame is kept clean as a condition with probability 0.5, and otherwise it is generated together with the future at the same noise level and supervised with weight 0.5. One set of weights therefore reads the measured touch when a sensor is present and imagines the current touch from the image and the robot state when it is not, which removes the distillation stage and the student model. The input of the anticipatory contact coupling (ACC) becomes the mean and root mean square of the current tactile latent together with a flag for sensor presence, and this also removes the two-pass training of HapticWAM. With video decoupling, a sample keeps the tactile observation, the future touch and the future actions at their ground truth with probability 0.3 and noises only the future video, with only the video loss active, so the model learns how the scene changes for given actions and touch. The weight of the video loss is raised from 0.1 to 1.0. At deployment the model still runs a single joint denoising step. For visualisation, the actions and touch from that step are held fixed and the video alone is refined for 10 more steps.
+Event times follow a discrete-time hazard model. The 3 s after the current time are split into 12 bins, and for each event the model predicts
 
-Finally, a causal convolution over the six future slots reads slip and contact probabilities for each finger from the hidden states of the future-touch frames. Slip labels are derived at the native sensor rate, a slip counts only when two consecutive frames in contact exceed the slip threshold, and the slip loss is a focal loss computed on contact slots only. The whole model has about 57 M trainable parameters against 27.9 M for the HapticWAM teacher, and its sequence has 13 frames and 4,160 tokens against 14 frames and 4,480 tokens.
+$$h_k=P\big(T\in(k\Delta,(k+1)\Delta]\ \big|\ T>k\Delta\big),\qquad F_k=1-\prod_{j=0}^{k}(1-h_j),$$
+
+where $T$ is the time of the first occurrence of the event, $\Delta=0.25$ s is the bin width, $k=0,\dots,11$ indexes the bins, $h_k$ is the hazard of bin $k$ and $F_k$ is the probability that the event has happened by the end of bin $k$. The hazard model handles events that do not occur within 3 s as right-censored samples and gives a calibrated distribution, which the decision step relies on. The prediction head sits after block 14 of the 28 backbone blocks. Its output feeds the anticipatory contact coupling (ACC) of HapticWAM, which produces the contact gate and the closing veto and turns the prediction into an attention bias for blocks 15 to 28 only. A summary of the predicted probabilities is also added to the future-touch and action tokens. The first half of the network thus forms a prediction of the coming contact, and the second half generates under it.
+
+For each event $e$, the schedule takes the bin with the lowest expected cost
+
+$$\hat{\pi}_e=\arg\min_{j}\sum_{k}p_e(k)\,C_e[j,k],\qquad p_e(k)=F_{e,k}-F_{e,k-1},$$
+
+where $j$ and $k$ range over the 12 bins and the outcome that the event does not occur, $p_e(k)$ is the predicted probability that the event first occurs in bin $k$, and $C_e[j,k]$ is the cost of deciding $j$ when the event actually falls in $k$. The cost is asymmetric. Closing too early leaves the hand above the object, deciding not to close stops the descent, and closing one or two bins late costs little. For the gripper close we measure a cost matrix per task on training episodes. For the other six events we take the $q$ quantile of the event-time distribution, which is the Bayes decision under an asymmetric linear cost. The decided schedule enters the action tokens only, as the signed time from each action frame to each event. Touch and images see the schedule only through the actions generated under it, which matches the conditioning in the factorisation.
+
+Once the schedule is fixed, the action distribution is unimodal, so averaging several samples becomes safe. At deployment one planning call draws $N=4$ samples that share one schedule, decided from their averaged event probabilities, and executes
+
+$$\hat{a}=\frac{1}{N}\sum_{n=1}^{N}a^{(n)},\qquad a^{(n)}\sim p_\theta\big(a\mid\hat{\pi},o\big),$$
+
+where $a^{(n)}$ is the action of the $n$-th sample and $\hat{a}$ the executed action. Without a shared schedule the samples could land on different closing times, and their mean would hesitate again. Forecasts of touch, contact and images are generated under the median schedule, because the median is the best point estimate of when contact happens under an absolute time error.
+
+### Tactile latent space and camera-projected alignment
+
+Touch lives in one causal latent space that serves as both input and output. A small convolutional autoencoder, trained beforehand and then frozen, encodes the last four deformation fields of a fingertip together with their frame differences, and decodes the latent back into the current field. The two fingers are rewritten as
+
+$$z^{+}=\tfrac12\big(z^{L}+z^{R}\big),\qquad z^{-}=\tfrac12\big(z^{L}-z^{R}\big),\qquad \delta_l=\frac{z(t_0+\tau_l)-z(t_0)}{\sigma_l},$$
+
+where $z^{L}$ and $z^{R}$ are the latents of the left and right finger (the right pad is flipped vertically first so that both pads share a physical frame), $z^{+}$ is the common mode, which tells whether the object is held, and $z^{-}$ is the differential mode, which tells whether the load is balanced. The model predicts $\delta_l$, the change of the latent at $\tau_l=0.5l$ s ahead ($l=1,\dots,6$) relative to the current time $t_0$, scaled by the standard deviation $\sigma_l$ of such changes on the training split. A prediction of zero is the persistence forecast, and the decoded prediction is a full 64×80 deformation field.
+
+Touch and image are aligned through the camera. The fingertip position $\mathbf{p}$ in the robot base frame is projected into the image with the calibrated extrinsics $(R,\mathbf{t})$ and intrinsics $\mathbf{K}$, and a Gaussian $G$ with a standard deviation of 1.5 tokens is drawn around the projection on the 16×20 token grid. Four GeoBridge modules between backbone blocks exchange information in both directions,
+
+$$\tilde{\mathbf{u}}^{\text{img}}_{ij}=\mathbf{u}^{\text{img}}_{ij}+G(i,j)\,f_{\text{t}}\big(\mathbf{u}^{\text{tac}}\big),\qquad \tilde{\mathbf{u}}^{\text{tac}}=\mathbf{u}^{\text{tac}}+f_{\text{v}}\Big(\sum_{i,j}\bar{G}(i,j)\,\mathbf{u}^{\text{img}}_{ij}\Big),$$
+
+where $\mathbf{u}^{\text{img}}_{ij}$ is the image token at grid cell $(i,j)$, $\mathbf{u}^{\text{tac}}$ are the tactile tokens, $f_{\text{t}}$ and $f_{\text{v}}$ are small MLPs with zero-initialised output layers, and $\bar{G}$ is $G$ normalised to sum to one. Without tactile input the model relies on the second term to infer touch from what it sees near the fingertips. The rotary position rows of the tactile frames are shifted away from the image rows, so the only spatial link between the two modalities is $G$. For future frames, $G$ is centred on the fingertip projected at that future time, computed from the model's own predicted actions and never from the ground-truth trajectory.
+
+### One model with and without tactile input
+
+HapticWAM distils a separate student for robots without tactile sensors. CAEWM covers both settings with one set of weights. During training the tactile observation frame receives the time step
+
+$$t_{\text{obs}}=\begin{cases}0, & m=1,\\ t, & m=0,\end{cases}\qquad m\sim\mathrm{Bernoulli}(0.5),$$
+
+where $t$ is the time step shared by the generated frames of the sample. With $m=1$ the measured touch is a clean condition. With $m=0$ it is noised and reconstructed together with the future, so the model learns to infer the current touch from the image, the robot state and the instruction. This is the same idea as the per-modality time steps of UniDiffuser.
+
+Actions and the remaining tokens use partly separate parameters. Every LoRA on the backbone is split into a shared part and a part chosen by token type,
+
+$$\mathbf{y}=W\mathbf{x}+B_{\text{s}}A_{\text{s}}\,\mathbf{x}+B_{\kappa(\mathbf{x})}A_{\kappa(\mathbf{x})}\,\mathbf{x},\qquad \kappa(\mathbf{x})\in\{\text{act},\text{non}\},$$
+
+where $W$ is the frozen weight, $A_{\text{s}}$ and $B_{\text{s}}$ form a rank-8 adapter shared by all tokens, and $A_{\kappa(\mathbf{x})}$ and $B_{\kappa(\mathbf{x})}$ form a rank-8 adapter for action tokens or for all other tokens. Each token therefore gets a rank-16 update, half of it shared. Attention still runs over the whole sequence, as in Mixture-of-Transformers, but actions and observations no longer share one set of adapter weights.
+
+Sampling takes two Euler steps and follows the factorisation. The first step starts from noise, reads the event-time distribution, decides the schedule and gives a first estimate of the actions, touch and images, and the ACC gate and veto are read here. The second step keeps the schedule, uses the first action estimate to place the future fingertip projections, and refines everything.
+
+### Training
+
+The loss sums the rectified-flow velocity errors of the action, future image, future touch and tactile observation frames (weights 1.0, 0.3, 1.0 and 0.5, the last only on samples without tactile input), the negative log-likelihood of the event times and a Huber loss on fingertip pad and wrist force changes from the middle prediction head (0.5 each), a focal slip loss and a contact loss on the last-layer future-touch frames (0.5 each), and the event and ACC losses of HapticWAM. The schedule of a training sample is the ground truth for 50% of samples, the model's own median decision for 30% and unknown for the rest. The own decision comes from a gradient-free pass at $t=1$, the same condition as the first sampling step, and the same pass provides the action estimate for the future fingertip projections on half of the samples. Another 15% of samples keep touch and actions at their ground truth and noise only the video.
+
+The model is trained once from the Cosmos base for 20,000 updates with an effective batch of 8 (one sample per GPU, gradient accumulation of 4, two L40S cards), LoRA learning rate 1e-4, 3e-4 for new modules, 500 warm-up steps, cosine decay and an EMA of 0.999, which took about 30 hours. All results use the EMA weights of the last step, with no checkpoint selection on validation. The model has 52.8 M trainable parameters, 31.7 M of them in the adapters. The inference settings, namely the quantile $q$, the per-task close cost matrices and the weight that fuses the ACC contact probability with the predicted contact into the closing veto, are chosen on a training subset (every eighth training episode) and fixed before validation.
 
 ## Results
 
-We compare CAEWM with the released HapticWAM checkpoints. The HapticWAM teacher is trained for 20,000 updates on demonstrations and then fine-tuned for 2,000 updates on simulation episodes and robot rollouts. We report both checkpoints, and the second one is the teacher deployed in the paper. The student is distilled from the deployed teacher and runs without tactile input. For video we also include the four arms of the HapticWAM world-model loss study. CAEWM is evaluated with the same weights in two settings, once with the measured fingertip fields as input and once with the current touch imagined by the model. All numbers use the same 248 validation windows ([configs/eval/windows_val124x2_seed7.json](configs/eval/windows_val124x2_seed7.json)) drawn from episodes that never enter training, with one denoising step, four seeds per window, EMA weights and no previously imagined contact package. Contact quantities are scored with the HapticWAM scoring functions at 1, 2 and 3 s after the anchor, after the decoded CAEWM fields have been converted into the same contact package. Models are grouped by whether tactile input is available at inference. Within each group the best entry is in bold and the second is underlined.
+All numbers use the official HapticWAM split, with 991 training and 124 validation episodes, and the released HapticWAM checkpoints. The endpoint probe predicts the 1.6 s of actions that start 1.6 s before the first gripper close of each validation episode and measures the distance between the final end-effector position and the demonstration, over 124 windows with 4 seeds each. The other metrics use the fixed 248 validation windows in [configs/eval/windows_val124x2_seed7.json](configs/eval/windows_val124x2_seed7.json) with 4 seeds each. HapticWAM runs one denoising step as released. CAEWM acts with two steps and the mean of four samples and reports perception after one and two steps. Contact quantities are scored with the HapticWAM scoring functions after converting the decoded fields into the HapticWAM contact package. Confidence intervals come from a paired bootstrap over episodes.
 
-Table 1 covers the predicted contact. With tactile input CAEWM raises the contact mask IoU from 0.229 to 0.302, and it is the only model above the 0.243 obtained by keeping the current contact unchanged. Its lead grows with the prediction horizon, from 0.043 at 1 s to 0.091 at 3 s, while the deployed teacher falls from 0.204 to 0.158. Events are read from the event head of every model, because the packed event band of HapticWAM reaches an event accuracy below 0.09 on these windows. Without tactile input the HapticWAM student almost never predicts a contact region and detects few contact onsets, whereas CAEWM with imagined touch stays close to its own sensor setting on every event measure.
+Endpoint error in mm. Lower is better.
 
-<p align="center"><b>Table 1.</b> Contact prediction on 248 validation windows, pooled over 1, 2 and 3 s.</p>
-
-| Model | Mask IoU ↑ | CoP error ↓ | Event acc. ↑ | Contact-event F1 ↑ | Onset F1 ↑ | Onset error (ms) ↓ |
-|:--|:--:|:--:|:--:|:--:|:--:|:--:|
-| *With fingertip tactile input* | | | | | | |
-| HapticWAM Teacher (before simulation fine-tuning) | <u>0.229</u> | <u>0.477</u> | <u>0.791</u> | <u>0.916</u> | <u>0.935</u> | <u>334</u> |
-| HapticWAM Teacher | 0.181 | 0.531 | 0.654 | 0.778 | 0.663 | 502 |
-| CAEWM (Ours) | **0.302** | **0.365** | **0.829** | **0.932** | **0.946** | **277** |
-| *Without fingertip tactile input* | | | | | | |
-| HapticWAM Student | <u>0.007</u> | <u>0.557</u> | <u>0.557</u> | <u>0.644</u> | <u>0.108</u> | <u>515</u> |
-| CAEWM (Ours) | **0.180** | **0.436** | **0.821** | **0.934** | **0.935** | **302** |
-
-Table 2 asks a simpler question for each window, whether either fingertip will slip within the next second. The label is a debounced slip, and 7.3% of the windows are positive. HapticWAM offers two slip probabilities, one from its ACC event distribution and one from its event head at 1 s, and each HapticWAM entry takes the better of the two so that the baseline is not understated. CAEWM is scored by the largest slip probability of its event head over the first two future slots and both fingers. It ranks slip windows better than every HapticWAM model in both settings.
-
-<p align="center"><b>Table 2.</b> Slip anticipation within 1 s at window level.</p>
-
-| Model | AUROC ↑ | AP ↑ |
-|:--|:--:|:--:|
-| *With fingertip tactile input* | | |
-| HapticWAM Teacher (before simulation fine-tuning) | 0.763 | 0.204 |
-| HapticWAM Teacher | <u>0.820</u> | <u>0.316</u> |
-| CAEWM (Ours) | **0.884** | **0.412** |
-| *Without fingertip tactile input* | | |
-| HapticWAM Student | <u>0.753</u> | <u>0.170</u> |
-| CAEWM (Ours) | **0.865** | **0.300** |
-
-Table 3 compares the decoded future frames with the recorded frames at 1, 2 and 3 s, averaged over the three horizons, on the full image and on a 96×96 crop centred on the projected tool centre point where the gripper and the object are. None of the HapticWAM variants changes the picture much, and raising the video weight to 1.0 or enabling video attention in a 2,000-update fine-tune moves PSNR by less than 0.2 dB. With a single step CAEWM improves PSNR by 1.2 dB over the best HapticWAM variant and gives the highest SSIM, on the full frame and around the gripper. With 10 extra steps of video refinement it gives the lowest LPIPS on both.
-
-<p align="center"><b>Table 3.</b> Future video prediction, averaged over 1, 2 and 3 s.</p>
-
-| Model | Steps | PSNR ↑ | SSIM ↑ | LPIPS ↓ | Gripper PSNR ↑ | Gripper SSIM ↑ | Gripper LPIPS ↓ |
+| Model | Mean | Median | > 60 mm | Whiteboard | Waffles | Egg | Carton |
 |:--|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| HapticWAM Teacher (before simulation fine-tuning) | 1 | 19.76 | 0.728 | 0.192 | 15.20 | 0.495 | 0.385 |
-| HapticWAM Teacher (before simulation fine-tuning) | 5 | 19.43 | 0.748 | 0.160 | 14.72 | 0.507 | 0.318 |
-| HapticWAM Teacher | 1 | 19.75 | 0.735 | 0.191 | 15.17 | 0.499 | 0.387 |
-| HapticWAM Teacher, λ<sub>v</sub> = 1.0 | 1 | 19.94 | 0.741 | 0.188 | 15.27 | 0.504 | 0.392 |
-| HapticWAM Teacher, fine-tuning control | 1 | 19.77 | 0.729 | 0.191 | 15.20 | 0.495 | 0.389 |
-| HapticWAM Teacher, no video loss | 1 | 19.76 | 0.728 | 0.190 | 15.21 | 0.495 | 0.384 |
-| HapticWAM Teacher, video attention | 1 | 19.61 | 0.729 | 0.200 | 15.00 | 0.494 | 0.402 |
-| HapticWAM Student | 1 | 19.46 | 0.738 | 0.167 | 14.93 | 0.515 | <u>0.290</u> |
-| CAEWM (Ours) | 1 | **21.18** | **0.798** | <u>0.145</u> | **16.15** | **0.550** | 0.345 |
-| CAEWM (Ours), video refinement | 1 + 10 | <u>20.21</u> | <u>0.792</u> | **0.115** | <u>15.38</u> | <u>0.532</u> | **0.256** |
+| *With tactile input* | | | | | | | |
+| HapticWAM teacher (before sim fine-tuning) | 20.05 | 14.2 | 4.2% | 15.70 | **20.15** | 5.21 | 38.67 |
+| CAEWM | **15.87** | **11.4** | **2.2%** | **11.85** | 20.56 | **5.20** | **25.75** |
+| *Without tactile input* | | | | | | | |
+| HapticWAM student | 22.30 | 15.6 | 5.8% | 15.82 | 35.63 | 7.40 | 30.38 |
+| CAEWM | **16.11** | **11.4** | **2.4%** | **12.23** | **21.27** | **5.50** | **25.26** |
 
-The figure below shows a contact onset on the whiteboard task. At the anchor time the fingertips have not yet touched the object. CAEWM places both contact patches at the right location and with the right shape one second ahead, while neither HapticWAM model predicts any contact. The first two rows show the indentation depth, measured and decoded from the CAEWM prediction, and the last three rows show contact masks with the measured contact region outlined in black. The example was selected because the difference is clear, so it is not an average case.
+The paired difference to the teacher is −4.18 mm (95% CI [−6.94, −2.01]) and to the student −6.19 mm ([−8.14, −4.27]). Waffles with tactile input is the one result that does not beat the baseline, at +0.41 mm with an interval of [−1.62, +2.65].
 
-<p align="center"><img src="docs/figures/fig_contact_en_1/fig_contact_en_1.png" width="90%"></p>
+Contact prediction on 248 windows. Higher is better for the IoU and the F1 scores, lower for the errors.
 
-The next figure follows the validation recording of the egg task that contains the most measured slip, with the anchor moved along it every 0.25 s. The slip probability of CAEWM starts to rise about a second before the first measured slip, peaks just before it and drops once the slip is over, while the HapticWAM teacher stays below 0.01 and the student below 0.04 over the whole recording.
+| Model | Steps | Mask IoU | CoP error | Event F1 | Onset F1 | Onset error (ms) |
+|:--|:--:|:--:|:--:|:--:|:--:|:--:|
+| *With tactile input* | | | | | | |
+| HapticWAM teacher (before sim fine-tuning) | 1 | 0.229 | 0.477 | 0.916 | 0.935 | 334 |
+| HapticWAM teacher (after sim fine-tuning) | 1 | 0.181 | 0.531 | 0.778 | 0.663 | 502 |
+| CAEWM | 1 | 0.309 | **0.349** | **0.931** | 0.955 | **314** |
+| CAEWM | 2 | **0.312** | 0.375 | 0.927 | **0.956** | 325 |
+| *Without tactile input* | | | | | | |
+| HapticWAM student | 1 | 0.007 | 0.557 | 0.644 | 0.108 | 515 |
+| CAEWM | 1 | **0.185** | **0.448** | **0.934** | **0.944** | **310** |
+| CAEWM | 2 | 0.184 | 0.486 | 0.929 | 0.937 | 328 |
 
-<p align="center"><img src="docs/figures/fig_slip_en/fig_slip_en.png" width="90%"></p>
+ACC contact gate and closing veto at the first sampling step, with tactile input and the deployed threshold of 0.5. Higher is better. The second row applies the CAEWM readout, the mean over four samples and the fused veto, to the HapticWAM teacher.
+
+| Model | Readout | Gate AUROC | Gate F1 | Veto AUROC | Veto F1 |
+|:--|:--|:--:|:--:|:--:|:--:|
+| HapticWAM teacher | one sample, as released | 0.949 | 0.889 | 0.904 | 0.850 |
+| HapticWAM teacher | mean of four, fused veto | 0.949 | **0.898** | 0.891 | 0.852 |
+| CAEWM | mean of four, fused veto | **0.952** | **0.898** | **0.938** | **0.869** |
+
+Event anticipation within 1 s, with tactile input. Higher is better except for the ECE. HapticWAM predicts neither the close nor the lift.
+
+| Model | Slip AUROC | Slip AP | Slip ECE | Onset AUROC | Close AUROC | Lift AUROC | Release AP |
+|:--|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| HapticWAM teacher (before sim fine-tuning) | 0.763 | 0.204 | 0.066 | 0.843 | – | – | 0.460 |
+| CAEWM | **0.943** | **0.451** | **0.024** | **0.897** | 0.959 | 0.948 | **0.697** |
+
+CAEWM also predicts fingertip pad and wrist force changes, which HapticWAM does not. Measured as skill over the persistence forecast, the pad force reaches 0.25, 0.51 and 0.76 at 0.5, 1 and 3 s, and the wrist wrench 0.34, 0.41 and 0.65.
+
+The decoded 64×80 deformation fields reach an IoU of 0.455 and a CRPS of 0.0279 with tactile input. Without tactile input the one-step IoU is 0.295, above two baselines that see the same information as the model, namely holding the model's own estimate of the current touch (0.157) and nearest-neighbour retrieval from the training set on DINOv3 image features and the robot state (0.274). Retrieval still has a slightly lower CRPS (0.0337 against 0.0346 for CAEWM with two steps), and persistence of the measured current field, which the model cannot see in this setting, reaches 0.331.
+
+Future images, averaged over 1, 2 and 3 s, and FVD over 248 windows. Higher is better for PSNR and SSIM, lower for LPIPS and FVD. The gripper region is a 96×96 crop around the true fingertip.
+
+| Model | Steps | PSNR | SSIM | LPIPS | Gripper LPIPS | FVD |
+|:--|:--:|:--:|:--:|:--:|:--:|:--:|
+| Copy the current frame | – | 19.82 | 0.827 | 0.107 | – | 896.9 |
+| HapticWAM teacher (before sim fine-tuning) | 1 | 19.76 | 0.728 | 0.192 | 0.385 | 1145.9 |
+| CAEWM | 1 | **20.45** | 0.773 | 0.164 | 0.352 | 966.6 |
+| CAEWM | 2 | 20.43 | **0.780** | **0.152** | **0.325** | **852.2** |
+
+The ablation below changes only the schedule or the decision rule on the same weights, with tactile input. Lower is better. The last row feeds the schedule of the demonstration and is an oracle.
+
+| Schedule and execution | Mean (mm) | > 60 mm | Carton | Other three tasks |
+|:--|:--:|:--:|:--:|:--:|
+| No schedule (all events unknown), one sample | 19.30 | 5.4% | 40.12 | 12.65 |
+| Predicted schedule, median, one sample | 18.91 | 5.0% | 39.32 | 12.40 |
+| Predicted schedule, q = 0.8, one sample | 16.94 | 3.6% | 32.98 | 11.83 |
+| Same, future fingertip projections off | 16.93 | 3.4% | 33.15 | 11.75 |
+| Predicted schedule, Bayes close decision, mean of four (deployed) | 15.87 | 2.2% | 25.75 | 12.72 |
+| Ground-truth schedule, one sample (oracle) | 15.55 | 3.0% | 28.13 | 11.53 |
+
+Planning takes 428 ms for one two-step sample on an idle L40S, 2128 ms for the deployed mean of four, and about 2.6 s when the forecast under the median schedule is added.
 
 ## Known limitations
 
-The main weakness of V1 is action accuracy. The offline terminal endpoint probe of HapticWAM anchors each validation recording 1.6 s before the gripper first closes and measures how far the end of the predicted action chunk lands from where the demonstrator went. On this probe CAEWM reaches 30.37 mm with tactile input and 29.26 mm without it, against 20.04 mm for the HapticWAM teacher and 22.30 mm for the student, and it is even worse than the 28.23 mm of a policy that does not move. The median error is close to the baseline, and nearly the whole gap comes from the 13% of windows with errors above 60 mm, which the teacher keeps at 4%. These failures sit in the carton and waffles tasks and almost all follow one pattern. Before the gripper has closed, the model already lifts as if the object were held, by 100 to 190 mm, in the same direction for all four seeds. The error is the same with and without tactile input, so it comes from a wrong estimate of the grasp phase rather than from touch. We see three likely causes, none of which has been tested on its own yet. Video decoupling removes the action loss from 30% of the samples while the video weight rises tenfold, so actions receive less training signal. ACC now reads the current touch, which is always empty before the gripper closes, whereas HapticWAM fed it the model's own prediction of future contact. The future prediction of CAEWM also lacks the wrist wrench and the pad force, although the transfer of the object's weight to the wrist is the most direct sign that a grasp has succeeded.
-
-<p align="center"><b>Table 4.</b> Terminal endpoint error in mm on 124 validation windows with four seeds and one step.</p>
-
-| Model | Mean ↓ | Median ↓ | > 60 mm ↓ | Whiteboard ↓ | Waffles ↓ | Egg ↓ | Carton ↓ |
-|:--|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| No motion | 28.23 | – | – | – | – | – | – |
-| HapticWAM Teacher (before simulation fine-tuning) | **20.04** | **14.1** | **4%** | **15.7** | **20.1** | **5.2** | 38.6 |
-| HapticWAM Student | 22.30 | 15.7 | 6% | 15.8 | 35.6 | 7.4 | **30.4** |
-| CAEWM (Ours), with tactile input | 30.37 | 15.0 | 13% | 16.9 | 31.2 | 5.3 | 68.7 |
-| CAEWM (Ours), without tactile input | 29.26 | 14.9 | 12% | 16.4 | 28.9 | 5.6 | 66.7 |
-
-Several smaller weaknesses remain. With imagined touch the shape and location of the contact region are still poor, with a mask IoU of 0.180, and on the full-resolution fields the skill over persistence is negative at 0.5, 1 and 1.5 s and only turns positive from 2 s onwards. The ACC contact gate and closing veto are slightly weaker than those of the HapticWAM teacher before simulation fine-tuning, with an AUROC of 0.943 against 0.949 for the gate and 0.884 against 0.904 for the veto, which matters because these signals control gripper closure at deployment. One-step predictions are close to a conditional mean, so decoded fields are too smooth and the indentation depth at a new contact is underestimated, and the future frames, although better than every HapticWAM variant, do not yet beat simply copying the current frame on SSIM and LPIPS. The model has twice the trainable parameters of the teacher, mostly in the four bridges, and it does not predict the normal force field or the wrist wrench.
-
-A code review after training found two flaws in the V1 training step, both in [phantom/caewm/rf.py](phantom/caewm/rf.py). The event cross-entropy is not masked out on video-decoupled samples, so in about 30% of the samples the event head reads future-touch frames that hold the ground truth instead of a prediction. When the conditions are dropped for classifier-free training, which happens in 10% of the samples, the tactile observation is zeroed and still supervised, so the model is asked to reconstruct a mean latent there. Neither affects evaluation, since no condition is dropped and nothing is pinned at inference, but both should be fixed before the next model is trained from scratch. Finally, all results are offline. CAEWM has not been run on the robot, and the main claim of HapticWAM is closed-loop placement success. V1 is a single training run, so there is no estimate of the variance across training seeds.
+The waffles endpoint with tactile input stays 0.41 mm above the HapticWAM teacher, and egg is ahead by only 0.01 mm. If the teacher also averages four samples, it reaches 19.72 mm overall, still 3.85 mm behind CAEWM, but 5.05 mm on egg and 19.92 mm on waffles, both ahead of CAEWM. Most of the remaining error comes from the close decision. About 15% of the samples close two or more bins early or decide not to close, and averaging four samples does not change this share, so the error is systematic. The close cost matrices can only be measured on training episodes, where the model reproduces the demonstration even under a shifted schedule, so the measured costs are compressed. On carton, shifting the close by three bins either way changes the cost by only about 1.5 mm. Their shape is reasonable but their scale is not. The Bayes close decision, the mean of four samples and the fused veto were added after comparing the trained weights with the baseline, although their settings come only from training data. The future fingertip projections have no measurable effect on the 16×20 grid with a 1.6 s action chunk, and the split into shared and action-specific adapters has not been ablated in the final configuration. Deployed planning is five to six times slower than a single sample, and the model has more trainable parameters than the HapticWAM teacher (52.8 M against 27.9 M). Carton varies a lot between training runs, by up to about 13 mm in our experience with the same recipe, and the model was trained only once. All results are offline, and the model has not yet been run in closed loop in simulation or on the robot.
 
 ## Repository layout
 
-The CAEWM code lives next to the baseline code it builds on. The table lists the files that make up CAEWM and the tools that produce the numbers above. Everything else under `phantom/` is the shared infrastructure for data loading, the backbone, the training loop and the official scoring functions.
+The CAEWM code lives next to the baseline code it builds on. The code calls the contact schedule a plan, so the related flags are `--plan` and `--plan-rule`.
 
 | Path | Contents |
 |:--|:--|
-| `phantom/model/tactile/tokenizer.py` | causal tactile autoencoder, mirroring and common and differential split |
-| `phantom/train/pretrain_tactile_ae.py` | tokenizer training and export of latent statistics |
-| `phantom/data/tactile_cache.py` | per-episode cache of the five field channels at 64×80 with native-rate contact and slip quantities |
-| `phantom/caewm/build_latent_cache.py` | encodes every cached frame with the frozen tokenizer |
-| `phantom/caewm/layout.py`, `packing.py` | 13-frame sequence layout and lossless packing of tactile latents into frames |
-| `phantom/caewm/geometry.py`, `bridge.py` | tool centre point projection, Gaussian map and GeoBridge |
-| `phantom/caewm/dit.py` | backbone wrapper with the bridges, shifted tactile position rows and the ACC visual summary |
-| `phantom/caewm/rf.py` | rectified flow with Touch Forcing, video decoupling, losses and sampling in both modes |
-| `phantom/caewm/heads.py` | slip and contact readout and the focal loss |
-| `phantom/caewm/windows.py` | training windows with tactile latents, future targets, slip labels and the projected tool centre point |
-| `phantom/caewm/config.py`, `builder.py`, `paths.py` | model configuration, model assembly and default locations |
-| `tools/terminal_eval.py` | terminal endpoint probe, with `--touch sensor` or `--touch imagine` for CAEWM |
-| `tools/cae_imagination_eval.py`, `tools/official_event_head_eval.py` | contact package and event metrics for CAEWM and for HapticWAM checkpoints |
-| `tools/cae_tactile_eval.py`, `tools/slip_baseline_auroc.py`, `tools/official_head_slip_auroc.py` | full-resolution touch and slip anticipation |
-| `tools/video_dump.py`, `tools/video_quality_score.py` | future frame export and PSNR, SSIM and LPIPS scoring |
-| `tests/test_caewm.py` | packing round trip, layout, gradients, zero-initialised bridges and both sampling modes |
+| `phantom/model/tactile/tokenizer.py`, `phantom/train/pretrain_tactile_ae.py` | causal tactile autoencoder and its training |
+| `phantom/caewm/` | sequence layout, tactile packing, camera projection, GeoBridge, random tactile conditioning, slip and contact heads |
+| `phantom/caewm2/events.py`, `windows.py` | event-time and force labels per episode and the training windows that use them |
+| `phantom/caewm2/heads.py`, `dit.py`, `rf.py` | event-time and force prediction head after block 14, ACC conditioning of the later blocks, losses |
+| `phantom/caewm3/schedule.py` | schedule decisions (quantile, Bayes, shared over samples) and the time-to-event features |
+| `phantom/caewm3/bridge.py`, `geometry.py` | GeoBridge with future fingertip projections |
+| `phantom/caewm3/group_lora.py` | shared and action-specific LoRA |
+| `phantom/caewm3/dit.py`, `rf.py`, `builder.py`, `load.py` | schedule injection, two-step sampling, model assembly and loading |
+| `tools/terminal_eval.py`, `tools/v3_report.py`, `tools/v3_pair.py` | endpoint probe, decomposed endpoint metrics and paired bootstrap |
+| `tools/v3_cost_table.py`, `tools/v3_train_windows.py`, `tools/v3_acc_deploy.py` | close cost matrices, training-subset windows and the deployed ACC readout |
+| `tools/cae_imagination_eval.py`, `tools/cae_tactile_eval.py`, `tools/v2_event_eval.py` | contact package, deformation fields, event anticipation and force skill |
+| `tools/v3_knn_tactile.py`, `tools/v3_anchor_shift.py` | retrieval baseline and the size of the future projection shift |
+| `tools/video_dump.py`, `tools/video_quality_score.py`, `tools/v3_fvd.py` | future frames, PSNR, SSIM, LPIPS and FVD |
+| `tests/test_caewm3.py` | schedule decisions, LoRA routing, projections and sampling |
 
 ## Setup
 
-We train and evaluate in a conda environment with Python 3.11 and PyTorch 2.13 for CUDA 12.9. The pinned packages are in `requirements/`, and the repository installs in editable mode on top of them. The Cosmos-Predict2.5 code is a git submodule and is imported as a library, not installed. LPIPS scoring needs `lpips` and `scikit-image`, which we keep in a separate environment.
+We use a conda environment with Python 3.11 and PyTorch 2.13 for CUDA 12.9. The pinned packages are in `requirements/`, and the repository installs in editable mode on top of them. The Cosmos-Predict2.5 code is a git submodule and is imported as a library. LPIPS scoring needs `lpips` and `scikit-image`, which we keep in a separate environment.
 
 ```bash
-git clone --recurse-submodules <this repository> caewm && cd caewm
+git clone --recurse-submodules -b caewm-final https://github.com/Simon-leong/Contact-Event-Aware-World-Model.git caewm && cd caewm
 pip install -r requirements/requirements-h100.txt   # or the file that matches your machine
 pip install -e .
 ```
 
-The backbone weights come from `nvidia/Cosmos-Predict2.5-2B` (only `robot/action-cond/` and `tokenizer.pth` are needed). The training data is the teleoperation dataset `armteam/hapticwam-teleop-dataset` with 1,115 episodes over four tasks. Unpack the eight task shards into `<data_root>/phantom-episodes/tasks`, unpack `batch_20260822.tar.zst` into a separate folder and link its 325 episodes into the task folders with `python tools/intake_recovery.py normalize <batch folder>` followed by `python tools/intake_recovery.py place <batch folder> <data_root>/phantom-episodes/tasks`, and extract `manifests_v6.tar` into `<data_root>/phantom-episodes`. The resulting `manifests/all.jsonl` must give 991 training and 124 validation episodes, which is the split the HapticWAM v6 teacher was trained on, and training should then log 7,928 windows. Copy `norm_stats.json` from the dataset and `text_embeddings.pt` from `armteam/hapticwam-teacher` into the task folder. The released HapticWAM checkpoints used for comparison are in `armteam/hapticwam-teacher`, `armteam/hapticwam-student` and `armteam/hapticwam-ablations`.
-
-All locations are read from `configs/paths.yaml`, and per-machine values go into the gitignored `configs/paths.local.yaml`.
+The backbone weights come from `nvidia/Cosmos-Predict2.5-2B` (only `robot/action-cond/` and `tokenizer.pth` are needed). The data is the teleoperation dataset `armteam/hapticwam-teleop-dataset`, assembled as described on the `main` branch, which must give 991 training and 124 validation episodes. The released HapticWAM checkpoints used for comparison are in `armteam/hapticwam-teacher` and `armteam/hapticwam-student`. FVD needs the StyleGAN-V I3D model `i3d_torchscript.pt`, whose location is read from `CAEWM_I3D`. All other locations are read from `configs/paths.yaml`, and per-machine values go into the gitignored `configs/paths.local.yaml`.
 
 ```yaml
 cosmos_weights_root: /path/to/cosmos-predict2.5-2b
@@ -139,44 +186,70 @@ runs_root: /path/to/caewm/runs
 cosmos_text_embedding_cache: /path/to/data/phantom-episodes/tasks/text_embeddings.pt
 ```
 
-From these values the code derives the episode folder `<data_root>/phantom-episodes/tasks`, the tactile caches `<runs_root>/../cache/tactile` and `<runs_root>/../cache/tactile_lat` and the tokenizer checkpoint `<runs_root>/tactile_ae/tactile_ae.pt` (see [phantom/caewm/paths.py](phantom/caewm/paths.py)). Every tool also accepts these locations as flags.
+The trained weights are shared with collaborators as a separate archive, laid out like `runs_root`, together with the close cost matrices that belong to them.
 
-## Reproducing V1
+## Reproducing the results
 
-The tactile tokenizer is trained before the world model, and its latents are cached once for every episode. The field cache holds the five channels of every episode at 64×80 and takes about 13 GB. Training the tokenizer for 30,000 steps takes under an hour on one L40S, and encoding the latents takes a few minutes. The tokenizer should reach a contact mask IoU of about 0.96 on the validation split, which the training log reports at the end.
+The tactile tokenizer, the tactile caches and the event cache are built once.
 
 ```bash
 export PYTHONPATH=$PWD
 python -m phantom.data.tactile_cache
 python -m phantom.train.pretrain_tactile_ae
 python -m phantom.caewm.build_latent_cache --ae <runs_root>/tactile_ae/tactile_ae.pt
+python -m phantom.caewm2.events
 ```
 
-The world model is then trained for 20,000 updates with an effective batch of 8, here on two GPUs with gradient accumulation of 4 as set in `configs/compute.caewm.yaml`. All other settings match the HapticWAM v6 teacher. On two L40S cards the run took about 24.5 hours.
+The world model is trained from the Cosmos base on two GPUs.
 
 ```bash
-torchrun --standalone --nproc_per_node 2 -m phantom.train.train_teacher --arch caewm \
+torchrun --standalone --nproc_per_node 2 -m phantom.train.train_teacher --arch caewm3 --sac-mode block_wise \
+  --plan --plan-bridge --group-lora \
   --data <data_root>/phantom-episodes/tasks --hardware configs/hardware.nuc.yaml \
-  --allow-config-drift --compute configs/compute.caewm.yaml --run-name caewm_v1 \
+  --allow-config-drift --compute configs/compute.caewm.yaml --run-name caewm_final \
   --max-steps 20000 --ckpt-every 1000 --eval-every 1000 \
-  --touch-forcing-p 0.5 --video-decouple-p 0.3 \
+  --tactile-ae <runs_root>/tactile_ae/tactile_ae.pt --tactile-lat-cache <runs_root>/../cache/tactile_lat \
+  --tactile-cache <runs_root>/../cache/tactile --event-cache <runs_root>/../cache/events \
+  --touch-forcing-p 0.5 --video-decouple-p 0.15 --loss-video 0.3 \
   --grasp-frac 0.3 --photo-aug 1.0 --wrench-baseline-rows 8 --cond-dropout 0.1 \
   --action-noise-per-strip --no-action-t-max-of-two \
   --lr 1e-4 --lr-new-modules 3e-4 --warmup-steps 500 --ema-decay 0.999 --device cuda
 ```
 
-Every evaluation reads the EMA weights of the final checkpoint and runs on one GPU. The touch mode is chosen with `--touch sensor` or `--touch imagine`. The HapticWAM rows come from the same tools pointed at the released checkpoints, and `tools/haptic_imagination_eval.py` gives the official contact package scores for them.
+The inference settings are then chosen on the training subset. The quantile is the one among the median, 0.6, 0.7 and 0.8 with the lowest endpoint error, which was 0.8 for our weights. The close cost matrices come from runs that give the model the demonstration's schedule with only the close moved by $d$ bins, or removed.
 
 ```bash
-CK=<runs_root>/teacher/caewm_v1/teacher_020000.pt
-python tools/terminal_eval.py --ckpt $CK --data <data_root>/phantom-episodes/tasks \
-  --hardware configs/hardware.nuc.yaml --split val --nfe 1 --seeds 4 --touch sensor --out terminal_sensor.json
-python -m tools.cae_imagination_eval --ckpt $CK --touch sensor --out imagination_sensor.json
-python -m tools.cae_tactile_eval --ckpt $CK --touch sensor --seeds 4 --out tactile_sensor
-python tools/video_dump.py --ckpt $CK --nfe 1 --refine 10 --out video_refine10
-python tools/video_quality_score.py video_refine10
-python -m tools.official_event_head_eval --ckpt <hapticwam checkpoint> --out head.json
+CK=<runs_root>/teacher/caewm_final/teacher_020000.pt
+TE="python tools/terminal_eval.py --ckpt $CK --data <data_root>/phantom-episodes/tasks --hardware configs/hardware.nuc.yaml --seeds 4 --dump-traj --nfe 2"
+for r in median q0.6 q0.7 q0.8; do $TE --split train --episode-stride 8 --plan decide --plan-rule $r --touch sensor --out costs/train8_$r.json; done
+for m in sensor imagine; do
+  for d in -3 -2 -1 0 1 2 3; do $TE --split train --episode-stride 8 --plan gt --plan-close-shift $d --touch $m --out costs/${m}_shift$d.json; done
+  $TE --split train --episode-stride 8 --plan gt --plan-close-none --touch $m --out costs/${m}_none.json
+  python -m tools.v3_cost_table --runs costs --mode $m --natural costs/train8_*.json --out costs/cost_$m.json
+done
 ```
+
+The deployed endpoint probe uses the selected quantile, the Bayes close decision and the mean of four samples. Swap `sensor` for `imagine` to withhold the measured touch.
+
+```bash
+$TE --split val --plan decide --plan-rule q0.8 --k-mean 4 --cost-table costs/cost_sensor.json --touch sensor --out terminal_sensor.json
+python -m tools.v3_report terminal_sensor.json --out terminal_sensor.report.json
+```
+
+Perception is evaluated under the median schedule, which is the default of the evaluation tools. The ACC readout needs the same rows on the training-subset windows to choose the veto fusion weight.
+
+```bash
+python -m tools.cae_imagination_eval --ckpt $CK --nfe 1 --touch sensor --out imagination_sensor.json
+python -m tools.cae_imagination_eval --ckpt $CK --nfe 1 --touch sensor --windows configs/eval/windows_train8x2_seed7.json --out train8_imagination.json
+python -m tools.v3_acc_deploy --train-rows train8_imagination_rows.json --val-rows imagination_sensor_rows.json --out acc.json
+python -m tools.cae_tactile_eval --ckpt $CK --touch imagine --seeds 4 --out tactile_imagine
+python -m tools.v3_knn_tactile --ckpt $CK --data <data_root>/phantom-episodes/tasks --out knn.json
+python -m tools.v2_event_eval --ckpt $CK --out events.json
+python tools/video_dump.py --ckpt $CK --nfe 2 --out video_nfe2 && python tools/video_quality_score.py video_nfe2
+python -m tools.v3_fvd --ckpt $CK --nfe 2 --touch sensor --out fvd.json
+```
+
+The HapticWAM rows come from the same tools pointed at the released checkpoints, and `tools/haptic_imagination_eval.py` gives their official contact package scores.
 
 ## License
 

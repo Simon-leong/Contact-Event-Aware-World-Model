@@ -61,6 +61,9 @@ TRAIN_ONLY_MODEL_FIELDS: frozenset[str] = frozenset({
 FINETUNE_MUTABLE_MODEL_FIELDS: frozenset[str] = TRAIN_ONLY_MODEL_FIELDS | frozenset({
     "action_noise_per_strip", "action_t_max_of_two", "cond_dropout_p",
     "video_attend", "loss.video",
+    # CAEWM V2 one-step self-distillation stage: a training objective, run from the main
+    # run's checkpoint by design
+    "distill_nfe",
 })
 
 

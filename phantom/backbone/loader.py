@@ -55,7 +55,7 @@ def setup_cosmos(paths: PathsConfig) -> None:
 def build_phantom_net(bb: BackboneConfig, mc: PhantomModelConfig, hw: HardwareConfig,
                       layout: SequenceLayout, paths: PathsConfig,
                       device: str = "cpu", dtype: torch.dtype = torch.float32,
-                      inference: bool = False, net_cls=None):
+                      inference: bool = False, net_cls=None, sac_mode: str | None = None):
     """Construct a PhantomDiT with the transcribed backbone kwargs.
 
     NOTE on max sizes: max_frames bounds the RoPE/temporal axis — must cover
@@ -78,6 +78,11 @@ def build_phantom_net(bb: BackboneConfig, mc: PhantomModelConfig, hw: HardwareCo
         from cosmos_predict2._src.predict2.networks.minimal_v4_dit import (
             CheckpointMode, SACConfig)
         extra["sac_config"] = SACConfig(mode=CheckpointMode.NONE)
+    elif sac_mode:
+        # training memory/compute trade-off only (block_wise = recompute the whole block)
+        from cosmos_predict2._src.predict2.networks.minimal_v4_dit import (
+            CheckpointMode, SACConfig)
+        extra["sac_config"] = SACConfig(mode=CheckpointMode(sac_mode))
 
     net = net_cls(
         layout=layout, mc=mc, bb=bb, hw=hw,

@@ -13,6 +13,7 @@ Stage 2: tools/video_quality_score.py (an env with lpips + scikit-image).
 from __future__ import annotations
 
 import argparse
+import os
 import json
 from pathlib import Path
 
@@ -36,16 +37,11 @@ def load(ckpt, hw, dev, dt):
     norm = NormStats(mean={k: np.asarray(v, np.float32) for k, v in ns["mean"].items()},
                      std={k: np.asarray(v, np.float32) for k, v in ns["std"].items()})
     wbr = C.wrench_baseline_rows_of(payload)
-    if mcd.get("arch") == "caewm":
-        from phantom.caewm.builder import build_caewm_model
-        from phantom.caewm.config import CaewmConfig
-        from phantom.caewm.windows import CaewmWindowSampler
-        mc = CaewmConfig.from_dict(mcd)
-        pm = build_caewm_model(hw, load_paths(), mc=mc, device=dev, dtype=dt, inference=True)
-        sampler = CaewmWindowSampler(hw, pm.bb, norm, seed=0, lat_cache=str(CP.stored_or_default(mc.tactile_lat_cache, CP.LAT_CACHE)),
-                                     tac_cache=str(CP.TAC_CACHE),
-                                     dz_std=pm.rf.tac_ae.dz_std.cpu().numpy(),
-                                     wrench_baseline_rows=wbr)
+    caewm = mcd.get("arch") in ("caewm", "caewm2", "caewm3")
+    if caewm:
+        from phantom.caewm3.load import build_from_payload
+        pm, sampler, mc = build_from_payload(payload, hw, load_paths(), norm, device=dev, dtype=dt,
+                                             wbr=wbr)
     else:
         from phantom.config.model import PhantomModelConfig
         from phantom.data.windows import WindowSampler
@@ -56,8 +52,14 @@ def load(ckpt, hw, dev, dt):
         sampler = WindowSampler(hw, pm.bb, norm, student=mc.student, seed=0,
                                 wrench_baseline_rows=wbr)
     C.load_phantom_checkpoint(Path(ckpt), pm.rf, hw=hw, load_ema=True, payload=payload)
+    rule = os.environ.get("CAEWM_PLAN_RULE")
+    if rule and mcd.get("arch") == "caewm3":
+        # the deployed decision rule (selected on the training split) for every tool that loads
+        # through here; terminal_eval takes --plan-rule instead
+        from dataclasses import replace
+        pm.rf.mc = replace(pm.rf.mc, plan_rule=rule)
     pm.rf.eval()
-    return pm, sampler, mcd.get("arch") == "caewm"
+    return pm, sampler, caewm
 
 
 def to_u8(x):

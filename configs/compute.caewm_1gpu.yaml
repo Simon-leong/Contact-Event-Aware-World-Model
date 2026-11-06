@@ -1,0 +1,12 @@
+# CAEWM V3 pilots: one GPU each, 1 x accum 8 = the same effective batch 8 as the
+# two-GPU DDP recipe (1 x accum 4 x 2 ranks)
+target: l40sx1
+profiles:
+  l40sx1:
+    description: "1 GPU, effective batch 8 via accum 8"
+    launcher: python
+    nproc_per_node: 1
+    dtype: bf16
+    batch_size: 1
+    grad_accum: 8
+    num_workers: 8

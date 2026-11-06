@@ -463,6 +463,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--drop-video", action="store_true",
                     help="drop the VIDEO_GEN frames at inference (CONTACT/ACTION never attend them: "
                          "actions should be unchanged, latency lower) — the deploy --drop-video lever")
+    ap.add_argument("--dump-traj", action="store_true",
+                    help="also record, per (window, seed), the predicted chunk's cumulative xyz (mm) and "
+                         "gripper, and the demonstration's cumulative xyz / gripper extended --gt-extend "
+                         "steps past the chunk, for the multimodal and timing metrics (tools/v3_report.py)")
+    ap.add_argument("--gt-extend", type=int, default=5,
+                    help="--dump-traj: demonstration steps recorded beyond the chunk end")
+    ap.add_argument("--dump-select", action="store_true",
+                    help="caewm2: also record, per (window, seed), the predicted action chunk "
+                         "and the cumulative close / lift / release probabilities of the event "
+                         "readout, for the candidate-selection analysis (tools/v2_select_eval.py)")
     ap.add_argument("--dump-video-error", action="store_true",
                     help="also record, per (window, seed), the error of the "
                          "IMAGINED FUTURE: video_err (MSE of the denoised "
@@ -512,6 +522,28 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--touch", default="sensor", choices=("sensor", "imagine"),
                     help="CAEWM checkpoints only: sensor = tactile obs pinned; "
                          "imagine = no tactile sensor, the obs is co-denoised")
+    ap.add_argument("--plan", default="decide", choices=("decide", "redecide", "gt", "unknown"),
+                    help="caewm3: the contact plan the actions are generated under: the model's own "
+                         "decision, the demonstration's (the oracle of the plan / execution error "
+                         "decomposition) or none")
+    ap.add_argument("--no-anchors", action="store_true",
+                    help="caewm3: keep layer 2 at the current fingertip on every sampling step (ablation)")
+    ap.add_argument("--episode-stride", type=int, default=1,
+                    help="every n-th episode of the split (the manifest is sorted by task, so a stride "
+                         "gives a task-balanced subset, e.g. 8 for ~124 of the 991 training episodes)")
+    ap.add_argument("--plan-rule", default=None,
+                    help="caewm3: decision rule, median / sample / q<quantile> (default: the checkpoint's)")
+    ap.add_argument("--plan-close-shift", type=int, default=0,
+                    help="caewm3 with --plan gt: move only the demonstration's close by this many bins "
+                         "(the decision cost table)")
+    ap.add_argument("--plan-close-none", action="store_true",
+                    help="caewm3 with --plan gt: decide the demonstration's close as NONE")
+    ap.add_argument("--cost-table", default=None,
+                    help="caewm3: per-task close cost matrices (tools/v3_cost_table.py); the close is "
+                         "then the Bayes decision under the readout, the other events --plan-rule")
+    ap.add_argument("--k-mean", type=int, default=1,
+                    help="caewm3: K draws per replan sharing one plan (decided from their averaged "
+                         "readout), the executed chunk is their mean")
     ap.add_argument("--pin-tac-fut-zero", action="store_true",
                     help="CAEWM diagnostic: pin the future-touch frames to zero increment")
     args = ap.parse_args(argv)
@@ -526,10 +558,17 @@ def main(argv: list[str] | None = None) -> int:
     paths = load_paths()
     from phantom.config.model import PhantomModelConfig
     payload = torch.load(args.ckpt, map_location="cpu", weights_only=False)
-    caewm = payload["configs"]["model"].get("arch") == "caewm"
-    if caewm:
+    arch = payload["configs"]["model"].get("arch")
+    caewm = arch in ("caewm", "caewm2", "caewm3")
+    if arch == "caewm":
         from phantom.caewm.config import CaewmConfig
         mc = CaewmConfig.from_dict(payload["configs"]["model"])
+    elif arch == "caewm2":
+        from phantom.caewm2.config import Caewm2Config
+        mc = Caewm2Config.from_dict(payload["configs"]["model"])
+    elif arch == "caewm3":
+        from phantom.caewm3.config import Caewm3Config
+        mc = Caewm3Config.from_dict(payload["configs"]["model"])
     else:
         mc = PhantomModelConfig.from_dict(payload["configs"]["model"])
     # rf.sample refuses this too; fail before the 286 MB model build so a typo
@@ -544,38 +583,32 @@ def main(argv: list[str] | None = None) -> int:
     # agree, so a student checkpoint (D9/D12 evaluate one offline) used to die
     # at "mc.student must agree with the student flag" (F12). `inference=True`
     # matches replay_rig.build_policy (activation checkpointing off).
+    ns = payload["norm_stats"]
+    norm = NormStats(mean={k: np.asarray(v, dtype=np.float32) for k, v in ns["mean"].items()},
+                     std={k: np.asarray(v, dtype=np.float32) for k, v in ns["std"].items()})
+    from phantom.train.common import wrench_baseline_rows_of
     if caewm:
-        from phantom.caewm.builder import build_caewm_model
-        pm = build_caewm_model(hw, paths, mc=mc, tiny=args.tiny, device=dev, dtype=dt,
-                               inference=True)
+        from phantom.caewm3.load import build_from_payload
+        pm, sampler, mc = build_from_payload(payload, hw, paths, norm, device=dev, dtype=dt,
+                                             tiny=args.tiny, wbr=wrench_baseline_rows_of(payload))
     else:
         pm = build_model(hw, paths, student=mc.student, tiny=args.tiny, mc=mc,
                          device=dev, dtype=dt, inference=True)
     C.load_phantom_checkpoint(Path(args.ckpt), pm.rf, hw=hw, load_ema=args.ema, payload=payload)
-    ns = payload["norm_stats"]
     a_mean = np.asarray(ns["mean"]["action"], dtype=np.float64)
     a_std = np.asarray(ns["std"]["action"], dtype=np.float64)
     z_idx = 2 * hw.arm.dof + 2          # q, qd, tcp_pose[x,y,Z], ... (hardware.py:505)
     z_mean, z_std = ur_z_moments(ns, z_idx)
-    norm = NormStats(mean={k: np.asarray(v, dtype=np.float32) for k, v in ns["mean"].items()},
-                     std={k: np.asarray(v, dtype=np.float32) for k, v in ns["std"].items()})
 
     data_root = Path(args.data)
     # the sampler must build the layout's OWN streams: a student checkpoint has
     # no gel/fields/contact_state frames (F12)
-    from phantom.train.common import wrench_baseline_rows_of
-    if caewm:
-        import phantom.caewm.paths as CP
-        from phantom.caewm.windows import CaewmWindowSampler
-        sampler = CaewmWindowSampler(hw, pm.bb, norm, seed=0,
-                                     lat_cache=str(CP.stored_or_default(mc.tactile_lat_cache, CP.LAT_CACHE)),
-                                     tac_cache=str(CP.TAC_CACHE),
-                                     dz_std=pm.rf.tac_ae.dz_std.cpu().numpy(),
-                                     wrench_baseline_rows=wrench_baseline_rows_of(payload))
-    else:
+    if not caewm:
         sampler = WindowSampler(hw, pm.bb, norm, student=mc.student, seed=0,
                                 wrench_baseline_rows=wrench_baseline_rows_of(payload))
     val_eps = resolve_episodes(data_root, args.split)
+    if args.episode_stride > 1:
+        val_eps = val_eps[::args.episode_stride]      # task-balanced subset of a task-sorted split
     ds = C.WindowDataset(data_root, sampler, episodes=val_eps, windows_per_episode=1,
                          resample=False, seed=0)
     pm.rf.eval()
@@ -627,6 +660,19 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("--dump-video-error: this checkpoint's layout has no "
                          "VIDEO_GEN frames — there is no imagined future to score")
     skipped = 0
+    cost = json.load(open(args.cost_table))["cost"] if args.cost_table else None
+
+    def rule_for(task: str):
+        """The decision rule of one window: the plain rule, or a DecisionSpec carrying the task's
+        close cost matrix and the K-draw plan sharing."""
+        if cost is None and args.k_mean <= 1:
+            return args.plan_rule
+        from phantom.caewm3.schedule import DecisionSpec
+        key = task.lower()
+        key = key if (cost is None or key in cost) else key.split("_")[0]    # a failed demo: its task's table
+        C = torch.tensor(cost[key], dtype=torch.float32).unsqueeze(0) if cost else None
+        return DecisionSpec(base=args.plan_rule or mc.plan_rule, close_cost=C, group=max(1, args.k_mean))
+
     for wi in ds.index[: args.max_episodes]:
         tc = ds._close_time(wi.episode)
         if tc is None:
@@ -638,11 +684,27 @@ def main(argv: list[str] | None = None) -> int:
             continue
         item, batch = make_batch(wi.episode, t0)
         gt = batch["action_chunk"][0].float().cpu().numpy().astype(np.float64) * a_std + a_mean
+        if args.dump_traj:
+            H, rate = len(gt), hw.control.action_rate_hz
+            gt_ext = sampler._action_grid(sampler._ep(wi.episode),
+                                          t0 + (np.arange(H + args.gt_extend) + 1.0) / rate,
+                                          future=True).astype(np.float64)
+            # the chunk went through the bf16 batch, so agreement is only to bf16 precision; the
+            # first H steps are then replaced by the chunk itself so the official endpoint is unchanged
+            assert np.allclose(gt_ext[:H], gt, rtol=1e-2, atol=1e-2 * a_std.max()), \
+                "extended demonstration disagrees with the chunk"
+            gt_ext[:H] = gt
+            traj_gt = {"gt_xyz_ext": (np.cumsum(gt_ext[:, :3], 0) * 1000).tolist(),
+                       "gt_grip_ext": gt_ext[:, 6].tolist()}
         # absolute TCP z at the window start, for pred_close_height_mm
         ur0 = item["ur_state"]
         ur0 = ur0.numpy() if torch.is_tensor(ur0) else np.asarray(ur0)
         z0 = float(np.asarray(ur0, dtype=np.float64)[z_idx] * z_std + z_mean)
         preds = []
+        plans: list = []
+        plan_gt = (torch.cat([batch["finger_bin"].flatten(1), batch["phase_bin"]], 1)[0].cpu().tolist()
+                   if "finger_bin" in batch else None)
+        sel: list[dict] = []
         vids: list[np.ndarray] = []
         extras: list[dict] = []
         with torch.no_grad():
@@ -656,7 +718,15 @@ def main(argv: list[str] | None = None) -> int:
                 t_prev = t0 - chunk_s
                 if caewm:
                     p = pm.rf.sample(batch, nfe=args.nfe, touch=args.touch == "sensor",
-                                     pin_tac_fut_zero=args.pin_tac_fut_zero)
+                                     pin_tac_fut_zero=args.pin_tac_fut_zero,
+                                     **({"plan": args.plan, "plan_rule": rule_for(item.get("text", "")),
+                                         "anchors": not args.no_anchors,
+                                         "plan_close_shift": args.plan_close_shift,
+                                         "plan_close_none": args.plan_close_none,
+                                         "k_seeds": args.k_mean, "mean_action": args.k_mean > 1}
+                                        if arch == "caewm3" else {}))
+                    if getattr(p, "plan_B_7", None) is not None:
+                        plans.append(p.plan_B_7[0].cpu().tolist())
                 elif t_prev >= wi.lo:
                     _, pb = make_batch(wi.episode, t_prev)
                     prev_cpk = pm.rf.sample(pb, nfe=args.nfe, guidance_scale=args.guidance,
@@ -673,8 +743,21 @@ def main(argv: list[str] | None = None) -> int:
                 if args.dump_video_error:
                     vids.append(video_gen_latents(p.x_final_B_C_T_H_W, pm.rf.layout))
                     extras.append(acc_row(p))
+                if args.dump_select:
+                    from phantom.caewm2.heads import cumulative
+                    h = getattr(p, "mid_phase_hazard_B_12_3", None)
+                    h = getattr(p, "phase_hazard_B_12_3", None) if h is None else h
+                    sel.append({"pr_actions": preds[-1][1].tolist(),
+                                "phase_cum": None if h is None else cumulative(h)[0].cpu().numpy().tolist()})
         extra_cols = (video_rows(vids, gt_video_latents(item), extras)
                       if args.dump_video_error else [{}] * len(preds))
+        if args.dump_select:
+            extra_cols = [{**ex, **sl} for ex, sl in zip(extra_cols, sel)]
+        if plans:
+            extra_cols = [{**ex, "plan": pl, "plan_gt": plan_gt} for ex, pl in zip(extra_cols, plans)]
+        if args.dump_traj:
+            extra_cols = [{**ex, **traj_gt, "pr_xyz": (np.cumsum(pr[:, :3], 0) * 1000).tolist(),
+                           "pr_grip": pr[:, 6].tolist()} for (s_, pr), ex in zip(preds, extra_cols)]
         for (s, pr), ex in zip(preds, extra_cols):
             rows.append({"episode": wi.episode.name, "task": item.get("text", "?"),
                          "t0": float(t0), "seed": int(s), "z_start_mm": z0 * 1000,
@@ -686,7 +769,7 @@ def main(argv: list[str] | None = None) -> int:
                         head_steps=args.head_steps, drop_video=bool(args.drop_video),
                         null=args.null, null_semantics=null_semantics(args.null),
                         student=bool(mc.student), split=args.split,
-                        **({"arch": "caewm", "touch": args.touch} if caewm else {}),
+                        **({"arch": arch, "touch": args.touch} if caewm else {}),
                         persistent_noise=bool(args.persistent_noise),
                         max_episodes=args.max_episodes, ema=bool(args.ema),
                         skipped=skipped,

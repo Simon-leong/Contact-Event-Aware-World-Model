@@ -24,6 +24,8 @@ def main():
     ap.add_argument("--warmup", type=int, default=3)
     ap.add_argument("--touch", default="sensor")
     ap.add_argument("--refine", type=int, default=0)
+    ap.add_argument("--nfe", type=int, default=1)
+    ap.add_argument("--k", type=int, default=4, help="candidates per replan (deploy default 4)")
     a = ap.parse_args()
     hw = load_hardware(str(Path(__file__).resolve().parents[1] / "configs/hardware.nuc.yaml"))
     pm, sampler, caewm = load(a.ckpt, hw, "cuda", torch.bfloat16)
@@ -38,8 +40,8 @@ def main():
 
     def run():
         if caewm:
-            return pm.rf.sample(b, nfe=1, k_seeds=4, touch=a.touch == "sensor", video_refine_steps=a.refine)
-        return pm.rf.sample(b, nfe=1, k_seeds=4, prev_cpk=prev)
+            return pm.rf.sample(b, nfe=a.nfe, k_seeds=a.k, touch=a.touch == "sensor", video_refine_steps=a.refine)
+        return pm.rf.sample(b, nfe=a.nfe, k_seeds=a.k, prev_cpk=prev)
     ts = []
     with torch.no_grad():
         for i in range(a.warmup + a.iters):
@@ -48,7 +50,7 @@ def main():
             torch.cuda.synchronize()
             if i >= a.warmup:
                 ts.append(1000 * (time.perf_counter() - t))
-    print(json.dumps({"ckpt": a.ckpt, "touch": a.touch, "refine": a.refine, "median_ms": float(np.median(ts)),
+    print(json.dumps({"ckpt": a.ckpt, "touch": a.touch, "refine": a.refine, "nfe": a.nfe, "k": a.k, "median_ms": float(np.median(ts)),
                       "p90_ms": float(np.percentile(ts, 90)), "gpu": torch.cuda.get_device_name()}))
 
 

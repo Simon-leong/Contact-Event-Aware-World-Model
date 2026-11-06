@@ -369,14 +369,45 @@ def main(argv=None) -> int:
                          "(still recorded). With --student this is the "
                          "`vision_only` arm — the recovery_ratio denominator; "
                          "without it, the teacher minus its wrist signal.")
-    ap.add_argument("--arch", default="phantom", choices=["phantom", "caewm"],
+    ap.add_argument("--arch", default="phantom", choices=["phantom", "caewm", "caewm2", "caewm3"],
                     help="caewm = CAEWM v1 (tactile tokenizer latents, GeoBridge, "
-                         "group-wise noise); one model for both touch modes")
+                         "group-wise noise); one model for both touch modes. "
+                         "caewm2 = CAEWM V2 (event hazards + force, fingertip crops, "
+                         "mid-depth event gate)")
     ap.add_argument("--tactile-ae", default=None, help="default: <runs_root>/tactile_ae/tactile_ae.pt")
     ap.add_argument("--tactile-lat-cache", default=None, help="default: <runs_root>/../cache/tactile_lat")
     ap.add_argument("--tactile-cache", default=None, help="default: <runs_root>/../cache/tactile")
     ap.add_argument("--touch-forcing-p", type=float, default=0.5)
-    ap.add_argument("--video-decouple-p", type=float, default=0.3)
+    ap.add_argument("--video-decouple-p", type=float, default=None,
+                    help="default 0.3 for caewm, 0.15 for caewm2")
+    ap.add_argument("--event-cache", default=None, help="caewm2; default: <runs_root>/../cache/events")
+    ap.add_argument("--no-events", action="store_true", help="caewm2: drop layer 1 (hazard/force heads)")
+    ap.add_argument("--no-crop", action="store_true", help="caewm2: drop layer 2 (fingertip crops)")
+    ap.add_argument("--no-midgate", action="store_true", help="caewm2: drop layer 3 (mid-depth gate)")
+    ap.add_argument("--sac-mode", default=None, choices=["mm_only", "block_wise"],
+                    help="caewm2: activation checkpointing of the DiT blocks (default cosmos "
+                         "mm_only); block_wise recomputes whole blocks, less memory, same math")
+    ap.add_argument("--distill-nfe", type=int, default=0,
+                    help="caewm2: one-step self-distillation stage from --init-weights, teacher "
+                         "= the loaded model integrated with this many Euler steps")
+    ap.add_argument("--shortcut", action="store_true",
+                    help="caewm2: train for one-step inference with shortcut-model self-consistency")
+    ap.add_argument("--events-at", default="final", choices=["final", "mid"],
+                    help="caewm2: read layer 1 (events, forces) from the last block or the mid-depth readout")
+    ap.add_argument("--pad-transform", default="std", choices=["std", "slog"])
+    ap.add_argument("--force-loss", default="mse", choices=["mse", "huber"])
+    ap.add_argument("--loss-hazard", type=float, default=1.0)
+    ap.add_argument("--loss-mid-hazard", type=float, default=0.5)
+    ap.add_argument("--loss-force", type=float, default=0.5)
+    ap.add_argument("--plan", action="store_true", help="caewm3 layer 1: decide the contact plan, condition the actions on it")
+    ap.add_argument("--plan-p-gt", type=float, default=0.5)
+    ap.add_argument("--plan-p-self", type=float, default=0.3)
+    ap.add_argument("--plan-bridge", action="store_true",
+                    help="caewm3 layer 2: anchor the future frames on the model's own trajectory estimate")
+    ap.add_argument("--anchor-p", type=float, default=0.5)
+    ap.add_argument("--group-lora", action="store_true", help="caewm3 layer 3: shared + per-factor adapters")
+    ap.add_argument("--lora-r-shared", type=int, default=8)
+    ap.add_argument("--lora-r-private", type=int, default=8)
     args = ap.parse_args(argv)
     # argument-only validation FIRST: these must fail before DDP/compute/paths
     # setup, so a typo in a launch line costs nothing
@@ -442,7 +473,7 @@ def main(argv=None) -> int:
         log.info("WORLD-MODEL ABLATION: video_attend ON — CONTACT/ACTION "
                  "queries attend VIDEO_GEN; this checkpoint REFUSES "
                  "drop_video at inference")
-    if args.arch == "caewm":
+    if args.arch in ("caewm", "caewm2", "caewm3"):
         import phantom.caewm.paths as CP
         args.tactile_ae = args.tactile_ae or str(CP.TAC_AE)
         args.tactile_lat_cache = args.tactile_lat_cache or str(CP.LAT_CACHE)
@@ -453,13 +484,61 @@ def main(argv=None) -> int:
         kw = {f: getattr(mc, f) for f in ("video_attend", "rope_time_mode", "cond_dropout_p",
                                           "action_t_max_of_two", "mask_wrist",
                                           "action_noise_per_strip")}
+    if args.arch == "caewm":
         mc = CaewmConfig(**kw, acc=AccConfig(), loss=(
             LossWeights(video=1.0) if args.loss_video is None else loss),
             tactile_ae=args.tactile_ae, tactile_lat_cache=args.tactile_lat_cache,
-            touch_forcing_p=args.touch_forcing_p, video_decouple_p=args.video_decouple_p)
+            touch_forcing_p=args.touch_forcing_p,
+            video_decouple_p=0.3 if args.video_decouple_p is None else args.video_decouple_p)
         log.info("CAEWM v1: touch forcing p=%.2f, video decoupling p=%.2f, lambda_v=%.3g, "
                  "bridges at blocks %s", mc.touch_forcing_p, mc.video_decouple_p,
                  mc.loss.video, mc.bridge_blocks)
+    if args.arch == "caewm2":
+        import phantom.caewm2.paths as CP2
+        from phantom.caewm2.config import Caewm2Config
+        args.event_cache = args.event_cache or str(CP2.EVENT_CACHE)
+        mc = Caewm2Config(**kw, acc=AccConfig(), loss=(
+            LossWeights(video=0.3) if args.loss_video is None else loss),
+            tactile_ae=args.tactile_ae, tactile_lat_cache=args.tactile_lat_cache,
+            touch_forcing_p=args.touch_forcing_p,
+            video_decouple_p=0.15 if args.video_decouple_p is None else args.video_decouple_p,
+            use_events=not args.no_events, use_crop=not args.no_crop,
+            use_midgate=not args.no_midgate, event_cache=args.event_cache,
+            loss_hazard=args.loss_hazard, loss_mid_hazard=args.loss_mid_hazard,
+            loss_force=args.loss_force, distill_nfe=args.distill_nfe, use_shortcut=args.shortcut,
+            events_at=args.events_at, pad_transform=args.pad_transform, force_loss=args.force_loss)
+        assert not (mc.events_at == "mid" and not mc.use_midgate), "--events-at mid needs the mid-depth readout"
+        assert not (mc.use_shortcut and mc.distill_nfe), "--shortcut and --distill-nfe are alternatives"
+        if mc.distill_nfe:
+            # the teacher is a snapshot of the weights the stage starts from, taken on the
+            # first step: only --init-weights gives that start, a resume would not
+            assert args.init_weights and not args.resume, \
+                "--distill-nfe runs from --init-weights (the main run) and cannot be resumed"
+        log.info("CAEWM V2: layers events=%s crop=%s midgate=%s; touch forcing p=%.2f, "
+                 "video decoupling p=%.2f, lambda_v=%.3g", mc.use_events, mc.use_crop,
+                 mc.use_midgate, mc.touch_forcing_p, mc.video_decouple_p, mc.loss.video)
+    if args.arch == "caewm3":
+        import phantom.caewm2.paths as CP2
+        from phantom.caewm3.config import Caewm3Config
+        args.event_cache = args.event_cache or str(CP2.EVENT_CACHE)
+        mc = Caewm3Config(**kw, acc=AccConfig(), loss=(
+            LossWeights(video=0.3) if args.loss_video is None else loss),
+            tactile_ae=args.tactile_ae, tactile_lat_cache=args.tactile_lat_cache,
+            touch_forcing_p=args.touch_forcing_p,
+            video_decouple_p=0.15 if args.video_decouple_p is None else args.video_decouple_p,
+            event_cache=args.event_cache, loss_hazard=args.loss_hazard,
+            loss_mid_hazard=args.loss_mid_hazard, loss_force=args.loss_force,
+            use_plan=args.plan, plan_p_gt=args.plan_p_gt, plan_p_self=args.plan_p_self,
+            use_plan_bridge=args.plan_bridge, anchor_p=args.anchor_p,
+            group_lora=args.group_lora, lora_r_shared=args.lora_r_shared,
+            lora_r_private=args.lora_r_private)
+        assert not (args.no_events or args.no_midgate or args.distill_nfe or args.shortcut), \
+            "caewm3 builds on the V2 final configuration"
+        assert mc.plan_p_gt + mc.plan_p_self <= 1.0
+        log.info("CAEWM V3: plan %s (gt %.2f / self %.2f), plan bridge %s (p %.2f), group lora %s "
+                 "(r %d + %d); lambda_v=%.3g", mc.use_plan, mc.plan_p_gt, mc.plan_p_self,
+                 mc.use_plan_bridge, mc.anchor_p, mc.group_lora, mc.lora_r_shared,
+                 mc.lora_r_private, mc.loss.video)
     if args.student:
         # the `no_distill` / `vision_only` control arms (P10A): same program,
         # student LAYOUT — no OBS_GEL/OBS_MECH frames and no tactile encoders,
@@ -477,6 +556,14 @@ def main(argv=None) -> int:
         from phantom.caewm.builder import build_caewm_model
         pm = build_caewm_model(hw, paths, mc=mc, tiny=cfg.tiny, load_base=not cfg.tiny,
                                device=args.device, dtype=dtype)
+    elif args.arch == "caewm2":
+        from phantom.caewm2.builder import build_caewm2_model
+        pm = build_caewm2_model(hw, paths, mc=mc, tiny=cfg.tiny, load_base=not cfg.tiny,
+                                device=args.device, dtype=dtype, sac_mode=args.sac_mode)
+    elif args.arch == "caewm3":
+        from phantom.caewm3.builder import build_caewm3_model
+        pm = build_caewm3_model(hw, paths, mc=mc, tiny=cfg.tiny, load_base=not cfg.tiny,
+                                device=args.device, dtype=dtype, sac_mode=args.sac_mode)
     else:
         pm = build_model(hw, paths, student=args.student, tiny=cfg.tiny, mc=mc,
                          load_base=not cfg.tiny, device=args.device, dtype=dtype)
@@ -582,6 +669,25 @@ def main(argv=None) -> int:
             hw, pm.bb, norm, seed=cfg.seed, lat_cache=args.tactile_lat_cache,
             tac_cache=args.tactile_cache, dz_std=pm.rf.tac_ae.dz_std.cpu().numpy(),
             wrench_baseline_rows=int(getattr(cfg, "wrench_baseline_rows", 0) or 0))
+    elif args.arch == "caewm2":
+        from phantom.caewm2.windows import Caewm2WindowSampler
+        sampler = Caewm2WindowSampler(
+            hw, pm.bb, norm, seed=cfg.seed, lat_cache=args.tactile_lat_cache,
+            tac_cache=args.tactile_cache, dz_std=pm.rf.tac_ae.dz_std.cpu().numpy(),
+            wrench_baseline_rows=int(getattr(cfg, "wrench_baseline_rows", 0) or 0),
+            event_cache=mc.event_cache, use_crop=mc.use_crop, crop_px=mc.crop_px,
+            crop_res=mc.crop_res, crop_lead_s=mc.crop_lead_s, bin_dt=mc.bin_dt,
+            pad_transform=mc.pad_transform)
+    elif args.arch == "caewm3":
+        from phantom.caewm3.windows import Caewm3WindowSampler
+        pm.rf.set_action_norm(norm.mean["action"], norm.std["action"])
+        sampler = Caewm3WindowSampler(
+            hw, pm.bb, norm, seed=cfg.seed, lat_cache=args.tactile_lat_cache,
+            tac_cache=args.tactile_cache, dz_std=pm.rf.tac_ae.dz_std.cpu().numpy(),
+            wrench_baseline_rows=int(getattr(cfg, "wrench_baseline_rows", 0) or 0),
+            event_cache=mc.event_cache, use_crop=False, crop_px=mc.crop_px,
+            crop_res=mc.crop_res, crop_lead_s=mc.crop_lead_s, bin_dt=mc.bin_dt,
+            pad_transform=mc.pad_transform)
     else:
         sampler = WindowSampler(hw, pm.bb, norm, student=args.student, seed=cfg.seed,
                                 wrench_baseline_rows=int(getattr(cfg, "wrench_baseline_rows", 0) or 0))
