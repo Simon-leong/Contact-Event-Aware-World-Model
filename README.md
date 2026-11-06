@@ -55,7 +55,7 @@ python -m phantom.caewm2.events
 
 | Model | Contents | Download |
 |:--|:--|:--|
-| CAEWM | world model (`teacher_020000.pt`), tactile tokenizer (`tactile_ae.pt`) and the close cost tables used at deployment | [Google Drive](GOOGLE_DRIVE_LINK) |
+| CAEWM | world model (`teacher_020000.pt`), tactile tokenizer (`tactile_ae.pt`) and the close cost tables used at deployment | [Google Drive](https://drive.google.com/file/d/1jRNQtLTaUxg6pDstVIyaBayRuDhCSqMu/view?usp=sharing) |
 
 Unzip `CAEWM_final_weights.zip` and copy its `runs/` folder to your `runs_root`. The world model is then found at `<runs_root>/teacher/caewm_final/teacher_020000.pt` and the tokenizer at `<runs_root>/tactile_ae/tactile_ae.pt`. The archive contains its own README and SHA256 checksums.
 
