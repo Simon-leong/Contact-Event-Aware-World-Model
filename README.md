@@ -52,7 +52,7 @@ python -m phantom.caewm2.events
 
 ## Pretrained Models
 
-| Model | Contents | Download |
+| Model | Description | Download |
 |:--|:--|:--|
 | CAEWM | world model, tactile tokenizer and close cost tables | [Google Drive](https://drive.google.com/file/d/1jRNQtLTaUxg6pDstVIyaBayRuDhCSqMu/view?usp=sharing) |
 
